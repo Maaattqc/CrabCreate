@@ -191,4 +191,20 @@ describe('admin routes', () => {
     expect(mocks.findAuditLogs).toHaveBeenCalledWith(200, 0, 'ticket_');
     expect(mocks.countAuditLogs).toHaveBeenCalledWith('ticket_');
   });
+
+  it('GET /logs with feedback category filters by onboard_feedback', async () => {
+    const app = createApp();
+    mocks.findAuditLogs.mockReturnValue([
+      { id: 20, action: 'onboard_feedback', created_at: '2026-02-14T09:00:00' },
+    ]);
+    mocks.countAuditLogs.mockReturnValue(1);
+
+    const res = await request(app).get('/api/admin/logs?category=feedback&limit=50&offset=0');
+
+    expect(res.status).toBe(200);
+    expect(mocks.findAuditLogs).toHaveBeenCalledWith(50, 0, 'onboard_feedback');
+    expect(mocks.countAuditLogs).toHaveBeenCalledWith('onboard_feedback');
+    expect(res.body.logs).toHaveLength(1);
+    expect(res.body.logs[0].action).toBe('onboard_feedback');
+  });
 });
