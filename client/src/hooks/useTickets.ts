@@ -109,10 +109,20 @@ export function useTickets() {
     }
   }, [fetchTickets]);
 
+  // Insert a ticket locally (no API call) — used by onboarding demo
+  const insertLocalTicket = useCallback((ticket: Ticket) => {
+    setTickets(prev => [ticket, ...prev]);
+  }, []);
+
+  // Remove a ticket locally (no API call) — used by onboarding cleanup
+  const removeLocalTicket = useCallback((ticketId: number) => {
+    setTickets(prev => prev.filter(t => t.id !== ticketId));
+  }, []);
+
   return {
     tickets, loading, filters, setFilters,
     fetchTickets, resetAndFetch, create, update, remove,
     launch, approve, reject, retry, rollback,
-    updateTicketInState, reorder,
+    updateTicketInState, insertLocalTicket, removeLocalTicket, reorder,
   };
 }

@@ -92,6 +92,15 @@ function Dashboard() {
   const [showOnboarding, setShowOnboarding] = useState<boolean>(() => {
     return !localStorage.getItem('crab-onboarded');
   });
+  const demoTicketIdRef = useRef<number | null>(null);
+
+  // Re-check onboarding when user logs in (e.g. "Nouveau client" removes crab-onboarded then activates session)
+  useEffect(() => {
+    if (user && !localStorage.getItem('crab-onboarded')) {
+      setShowOnboarding(true);
+    }
+  }, [user]);
+
   const [showMascot, setShowMascot] = useState<boolean>(() => {
     const saved = localStorage.getItem('crab-mascot');
     return saved === null ? true : saved === 'true';
@@ -114,7 +123,7 @@ function Dashboard() {
   }, []);
 
   const { cursors, presence, sendCursorMove, sendCursorLeave } = useCursors();
-  const { tickets, fetchTickets, resetAndFetch, create, remove, launch, approve, reject, retry, rollback, updateTicketInState, reorder } = useTickets();
+  const { tickets, fetchTickets, resetAndFetch, create, remove, launch, approve, reject, retry, rollback, updateTicketInState, insertLocalTicket, removeLocalTicket, reorder } = useTickets();
   const { notifications, addNotification, removeNotification } = useNotifications(appConfig.notification_timeout_ms);
   const { on, off, emit } = useSocket();
   const { t } = useLanguage();
@@ -218,6 +227,79 @@ function Dashboard() {
     }
   };
 
+  // --- Onboarding: create demo ticket (local only, no API) ---
+  const handleCreateDemoTicket = async (): Promise<number> => {
+    const demoId = 1;
+    const now = new Date().toISOString();
+    demoTicketIdRef.current = demoId;
+    insertLocalTicket({
+      id: demoId,
+      title: t.onboardDemoTitle,
+      description: t.onboardDemoDesc,
+      status: 'backlog',
+      priority: 'medium',
+      template: 'feature',
+      ai_model: 'claude',
+      repo: 'main-site',
+      assignee: 'unassigned',
+      progress: 0,
+      cost_usd: 0,
+      tokens_used: 0,
+      lines_added: 0,
+      lines_removed: 0,
+      ai_review_score: null,
+      ai_review_data: null,
+      test_results: null,
+      target_files: '[]',
+      tags: '[]',
+      depends_on: '[]',
+      complexity: '',
+      position: 0,
+      due_date: null,
+      branch_name: '',
+      diff: '',
+      creator_email: null,
+      modifier_email: null,
+      created_at: now,
+      updated_at: now,
+    });
+    return demoId;
+  };
+
+  // --- Onboarding: simulate pipeline visually through all 10 columns (no API) ---
+  const handleSimulatePipeline = (ticketId: number, onStep: (status: string) => void, onComplete: () => void) => {
+    const FLY_DURATION = 550; // ghost fly animation time
+    const PIPELINE_STEPS: { status: string; progress: number; delay: number; fields?: Partial<Ticket> }[] = [
+      { status: 'queued',     progress: 5,   delay: 1200 },
+      { status: 'estimating', progress: 15,  delay: 1800,  fields: { cost_usd: 2.45 } },
+      { status: 'ai_coding',  progress: 35,  delay: 2200, fields: { lines_added: 234 } },
+      { status: 'ai_coding',  progress: 55,  delay: 2200, fields: { lines_added: 534 } },
+      { status: 'ai_review',  progress: 70,  delay: 1800,  fields: { ai_review_score: 92 } },
+      { status: 'testing',    progress: 80,  delay: 1200 },
+      { status: 'deploying',  progress: 88,  delay: 1200 },
+      { status: 'staging',    progress: 94,  delay: 1200 },
+      { status: 'review',     progress: 97,  delay: 1200 },
+      { status: 'approved',   progress: 100, delay: 4000 },
+    ];
+
+    let totalDelay = 0;
+    for (const step of PIPELINE_STEPS) {
+      totalDelay += step.delay;
+      const t = totalDelay;
+      // Notify onboarding first (triggers ghost fly animation)
+      setTimeout(() => { onStep(step.status); }, t);
+      // Update ticket state after ghost animation lands
+      setTimeout(() => {
+        updateTicketInState(ticketId, { status: step.status, progress: step.progress, ...step.fields });
+      }, t + FLY_DURATION);
+    }
+
+    // Notify onboarding when simulation is done (ticket stays in approved until user closes tutorial)
+    setTimeout(() => {
+      onComplete();
+    }, totalDelay + FLY_DURATION + 4000);
+  };
+
   const handleSetupComplete = async () => {
     setShowSetupModal(false);
     if (pendingLaunchId) {
@@ -257,23 +339,12 @@ function Dashboard() {
 
       <div className="flex-1 flex flex-col overflow-hidden">
         <FileLockBanner />
-        {user && !projectsLoading && !currentProject ? (
-          <div className="flex-1 flex flex-col items-center justify-center gap-4">
-            <div className="text-5xl">📁</div>
-            <p className="text-tx-faint text-sm">{t.projectCreateFirst}</p>
-            <button
-              onClick={() => setShowCreateProject(true)}
-              className="px-6 py-2.5 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 text-white text-sm font-medium hover:opacity-90 transition-opacity"
-            >
-              {t.projectCreate}
-            </button>
-          </div>
-        ) : viewMode === 'calendar' ? (
+        {viewMode === 'calendar' ? (
           <CalendarView tickets={filteredTickets} onTicketClick={handleTicketClick} />
         ) : viewMode === 'timeline' ? (
           <TimelineView tickets={filteredTickets} onTicketClick={handleTicketClick} />
         ) : viewMode === 'board' ? (
-          <KanbanBoard tickets={filteredTickets} onTicketClick={handleTicketClick} onLaunch={handleLaunch} onCreateClick={() => { if (!user) { openLogin(); return; } setShowCreate(true); }} onReorder={reorder} />
+          <KanbanBoard tickets={filteredTickets} onTicketClick={handleTicketClick} onLaunch={handleLaunch} onCreateClick={() => { if (!user) { openLogin(); return; } setShowCreate(true); }} onReorder={reorder} hideEmptyCTA={showOnboarding} />
         ) : (
           <ListView tickets={filteredTickets} onTicketClick={handleTicketClick} scoreThresholdGood={appConfig.score_threshold_good} scoreThresholdOk={appConfig.score_threshold_ok} />
         )}
@@ -328,10 +399,18 @@ function Dashboard() {
 
       {/* Onboarding */}
       {showOnboarding && (
-        <Onboarding onDone={() => {
-          setShowOnboarding(false);
-          localStorage.setItem('crab-onboarded', 'true');
-        }} />
+        <Onboarding
+          onDone={() => {
+            setShowOnboarding(false);
+            localStorage.setItem('crab-onboarded', 'true');
+            if (demoTicketIdRef.current) {
+              removeLocalTicket(demoTicketIdRef.current);
+              demoTicketIdRef.current = null;
+            }
+          }}
+          onCreateDemoTicket={handleCreateDemoTicket}
+          onSimulatePipeline={handleSimulatePipeline}
+        />
       )}
     </div>
   );

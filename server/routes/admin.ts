@@ -134,6 +134,7 @@ router.get('/logs', (req: Request, res: Response) => {
     ticket: 'ticket_',
     pipeline: 'pipeline_',
     admin: 'user_',
+    feedback: 'onboard_feedback',
   };
   // For auth, we need to match both "login" and "dev_login"
   let actionFilter: string | undefined;

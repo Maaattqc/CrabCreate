@@ -1,4 +1,4 @@
-import { Play, Settings, Move, Star } from 'lucide-react';
+import { Play, Settings, Move, Star, Check, X } from 'lucide-react';
 import { getColumnColor } from '../../constants';
 import { useLanguage } from '../../hooks/useLanguage';
 import { useAIDesign } from '../../hooks/useAIDesign';
@@ -56,7 +56,7 @@ export default function TicketCard({ ticket, onClick, onLaunch, viewers = [], dr
   return (
     <div
       onClick={() => onClick(ticket)}
-      className={`group bg-card border border-th-border rounded-xl p-3.5 cursor-pointer hover:border-th-border-strong hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/20 transition-all relative overflow-hidden anim-card anim-card-border ${aiDesign ? 'ai-glass' : ''} ${isActive && aiDesign ? 'ai-neon-active' : ''}`}
+      className={`group bg-card border border-th-border rounded-xl p-3.5 cursor-pointer hover:border-th-border-strong hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/20 transition-all relative overflow-hidden anim-card anim-card-border animate-[cardSlideIn_0.4s_ease-out] ${aiDesign ? 'ai-glass' : ''} ${isActive && aiDesign ? 'ai-neon-active' : ''}`}
       style={isActive && aiDesign ? { '--neon-color': `${statusColor}30` } as React.CSSProperties : undefined}
     >
       {/* Left color accent */}
@@ -151,6 +151,43 @@ export default function TicketCard({ ticket, onClick, onLaunch, viewers = [], dr
           </div>
         )}
 
+        {/* Cost & lines stats for active/completed pipeline tickets */}
+        {(ticket.cost_usd > 0 || ticket.lines_added > 0) && (
+          <div className="flex items-center gap-3 mb-2 text-[11px] font-mono text-tx-faint">
+            {ticket.cost_usd > 0 && (
+              <span className="flex items-center gap-1">
+                <span className="text-amber-400">$</span>{ticket.cost_usd.toFixed(2)}
+              </span>
+            )}
+            {ticket.lines_added > 0 && (
+              <span className="flex items-center gap-1">
+                <span className="text-green-400">+</span>{ticket.lines_added} {t.lines.toLowerCase()}
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Approve / Reject buttons for review status */}
+        {ticket.status === 'review' && (
+          <div className="flex flex-col gap-1.5 mb-2.5">
+            <button
+              data-onboard-approve-btn
+              onClick={(e: React.MouseEvent) => { e.stopPropagation(); }}
+              className="flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-green-600 text-white text-xs font-semibold shadow-lg shadow-green-600/20 transition-colors hover:bg-green-500"
+            >
+              <Check size={12} />
+              {t.approve}
+            </button>
+            <button
+              onClick={(e: React.MouseEvent) => { e.stopPropagation(); }}
+              className="flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-semibold transition-colors hover:bg-red-500/20"
+            >
+              <X size={12} />
+              {t.reject}
+            </button>
+          </div>
+        )}
+
         {/* Footer */}
         <div className="flex items-center">
           <button
@@ -177,6 +214,7 @@ export default function TicketCard({ ticket, onClick, onLaunch, viewers = [], dr
               onClick={(e: React.MouseEvent) => { e.stopPropagation(); onLaunch(ticket.id); }}
               className="p-2 rounded-lg bg-green-500/10 hover:bg-green-500/25 text-green-400 transition-all"
               title={t.launchPipeline}
+              data-onboard="launch-pipeline"
             >
               <Play size={14} fill="currentColor" />
             </button>

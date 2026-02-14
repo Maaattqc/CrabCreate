@@ -18,7 +18,6 @@ interface FormState {
   ai_model: string;
   repo: string;
   assignee: string;
-  due_date: string;
 }
 
 export default function CreateTicketModal({ onClose, onCreate }: CreateTicketModalProps) {
@@ -31,7 +30,6 @@ export default function CreateTicketModal({ onClose, onCreate }: CreateTicketMod
     ai_model: 'claude',
     repo: 'main-site',
     assignee: 'unassigned',
-    due_date: '',
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -45,7 +43,6 @@ export default function CreateTicketModal({ onClose, onCreate }: CreateTicketMod
     try {
       await onCreate({
         ...form,
-        due_date: form.due_date || null,
         target_files: [],
         tags: [],
         depends_on: [],
@@ -126,17 +123,6 @@ export default function CreateTicketModal({ onClose, onCreate }: CreateTicketMod
             >
               {AI_MODELS.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
             </select>
-          </div>
-
-          {/* Due Date */}
-          <div>
-            <label className="block text-xs text-tx-muted mb-1">{t.dueDate}</label>
-            <input
-              type="date"
-              value={form.due_date}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setForm(f => ({ ...f, due_date: e.target.value }))}
-              className="w-full bg-subtle border border-th-border-strong rounded-lg px-3 py-2 text-sm text-tx-secondary focus:outline-none focus:border-amber-500/50"
-            />
           </div>
 
           {/* Error */}

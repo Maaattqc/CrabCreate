@@ -1,71 +1,67 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import Onboarding from '../components/layout/Onboarding';
 import { LanguageProvider } from '../hooks/useLanguage';
 
 const wrapper = ({ children }: { children: React.ReactNode }) => <LanguageProvider>{children}</LanguageProvider>;
 
+function renderOnboarding(overrides?: {
+  onDone?: () => void;
+  onCreateDemoTicket?: () => Promise<number>;
+  onSimulatePipeline?: (id: number, onStep: (status: string) => void, onComplete: () => void) => void;
+}) {
+  const onDone = overrides?.onDone ?? vi.fn();
+  const onCreateDemoTicket = overrides?.onCreateDemoTicket ?? vi.fn<() => Promise<number>>().mockResolvedValue(42);
+  const onSimulatePipeline = overrides?.onSimulatePipeline ?? vi.fn<(id: number, onStep: (status: string) => void, cb: () => void) => void>().mockImplementation((_id, _onStep, cb) => { setTimeout(cb, 100); });
+  const result = render(
+    <Onboarding onDone={onDone} onCreateDemoTicket={onCreateDemoTicket} onSimulatePipeline={onSimulatePipeline} />,
+    { wrapper },
+  );
+  return { ...result, onDone, onCreateDemoTicket, onSimulatePipeline };
+}
+
+// Mock getBoundingClientRect for data-onboard elements
+beforeEach(() => {
+  Element.prototype.getBoundingClientRect = vi.fn().mockReturnValue({
+    top: 100, left: 200, right: 240, bottom: 140,
+    width: 40, height: 40, x: 200, y: 100,
+  });
+});
+
 describe('Onboarding', () => {
-  it('renders the welcome text', () => {
-    const onDone = vi.fn();
-    render(<Onboarding onDone={onDone} />, { wrapper });
-
-    // The French welcome text includes the crab emoji and 'Bienvenue'
-    // Multiple elements may match (the standalone emoji div + the heading), so use getAllByText
-    const matches = screen.getAllByText(/🦀|Bienvenue|Welcome/);
-    expect(matches.length).toBeGreaterThanOrEqual(1);
+  it('renders step 1 text and progress indicator', () => {
+    renderOnboarding();
+    expect(screen.getByText(/Créez un ticket|Create a ticket/)).toBeTruthy();
+    expect(screen.getByText(/1\/3/)).toBeTruthy();
   });
 
-  it('advances steps when clicking "Suivant"/"Next"', () => {
-    const onDone = vi.fn();
-    const { container } = render(<Onboarding onDone={onDone} />, { wrapper });
-
-    // Step indicators are rendered as small divs; the active one has a wider width class (w-8)
-    const getActiveIndicator = () =>
-      container.querySelector('.w-8.bg-gradient-to-r');
-
-    // Initially step 0 is active — the first indicator should have the active class
-    const indicators = container.querySelectorAll('.rounded-full');
-    expect(indicators.length).toBe(4);
-    expect(getActiveIndicator()).toBeTruthy();
-
-    // Click "Suivant" (Next) to advance to step 1
-    const nextButton = screen.getByText(/Suivant|Next/);
-    fireEvent.click(nextButton);
-
-    // After advancing, the active indicator should still exist (now on step 1)
-    expect(getActiveIndicator()).toBeTruthy();
-
-    // The previously active indicator (step 0) should now have the completed style
-    const completedIndicators = container.querySelectorAll('.w-4.bg-amber-500\\/40');
-    expect(completedIndicators.length).toBeGreaterThanOrEqual(1);
-  });
-
-  it('calls onDone when clicking the last step button', () => {
-    const onDone = vi.fn();
-    render(<Onboarding onDone={onDone} />, { wrapper });
+  it('clicking Suivant at step 0 starts cursor animation', async () => {
+    vi.useFakeTimers();
+    renderOnboarding();
 
     const nextButton = screen.getByText(/Suivant|Next/);
+    await act(async () => {
+      fireEvent.click(nextButton);
+    });
 
-    // Advance through all 4 steps (0 -> 1 -> 2 -> 3)
-    fireEvent.click(nextButton); // step 0 -> 1
-    fireEvent.click(nextButton); // step 1 -> 2
-    fireEvent.click(nextButton); // step 2 -> 3 (last step)
+    // The "Suivant" button should disappear (phase is no longer 'idle')
+    expect(screen.queryByText(/Suivant|Next/)).toBeNull();
 
-    // On the last step the button text changes to "C'est parti !" or "Let's go!"
-    const goButton = screen.getByText(/C'est parti|Let's go/);
-    fireEvent.click(goButton);
-
-    expect(onDone).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
   });
 
-  it('calls onDone when clicking "Passer"/"Skip"', () => {
+  it('shows quick tour subtitle', () => {
+    renderOnboarding();
+    expect(screen.getByText(/Tutoriel rapide|Quick tour/)).toBeTruthy();
+  });
+
+  it('clicking backdrop does NOT dismiss onboarding', () => {
     const onDone = vi.fn();
-    render(<Onboarding onDone={onDone} />, { wrapper });
+    const { container } = renderOnboarding({ onDone });
 
-    const skipButton = screen.getByText(/Passer|Skip/);
-    fireEvent.click(skipButton);
+    const backdrop = container.querySelector('.bg-black\\/60');
+    if (backdrop) fireEvent.click(backdrop);
 
-    expect(onDone).toHaveBeenCalledTimes(1);
+    expect(onDone).not.toHaveBeenCalled();
   });
 });

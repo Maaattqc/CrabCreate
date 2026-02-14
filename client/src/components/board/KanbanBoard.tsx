@@ -12,9 +12,10 @@ interface KanbanBoardProps {
   onLaunch: (id: number) => void;
   onCreateClick: () => void;
   onReorder?: (ticketIds: number[]) => void;
+  hideEmptyCTA?: boolean;
 }
 
-export default function KanbanBoard({ tickets, onTicketClick, onLaunch, onCreateClick, onReorder }: KanbanBoardProps) {
+export default function KanbanBoard({ tickets, onTicketClick, onLaunch, onCreateClick, onReorder, hideEmptyCTA }: KanbanBoardProps) {
   const { viewersMap, getViewers } = useTicketViewers();
   const { isDragging, startDragging, stopDragging } = useDragAwareness();
   const sensors = useSensors(
@@ -101,7 +102,7 @@ export default function KanbanBoard({ tickets, onTicketClick, onLaunch, onCreate
       </div>
 
       {/* Columns */}
-      <div className="flex gap-0 flex-1 px-3 pb-3">
+      <div className="flex gap-0 flex-1 px-3 pb-3" data-onboard="columns">
         {COLUMNS.map((column, i) => {
           const columnTickets = tickets.filter(t => t.status === column.id);
           return (
@@ -113,6 +114,7 @@ export default function KanbanBoard({ tickets, onTicketClick, onLaunch, onCreate
                 onLaunch={onLaunch}
                 onCreateClick={onCreateClick}
                 stepNumber={i + 1}
+                totalTickets={hideEmptyCTA ? -1 : tickets.length}
                 getViewers={getViewers}
                 isDragging={isDragging}
               />

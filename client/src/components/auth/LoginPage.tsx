@@ -116,17 +116,18 @@ export default function LoginPage({ onClose }: LoginPageProps) {
     }
   };
 
-  const handleDevLogin = async (role: 'admin' | 'client') => {
+  const handleDevLogin = async (role: 'admin' | 'client' | 'new') => {
     setError('');
     setLoading(true);
     try {
-      const endpoint = role === 'admin' ? '/api/auth/dev-login' : '/api/auth/dev-login-client';
+      const endpoint = role === 'admin' ? '/api/auth/dev-login' : role === 'new' ? '/api/auth/dev-login-new' : '/api/auth/dev-login-client';
       const res = await fetch(endpoint, {
         method: 'POST',
         credentials: 'include',
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Dev login failed');
+      if (role === 'new') localStorage.removeItem('crab-onboarded');
       activateSession(data.user);
     } catch (err) {
       setError((err as Error).message);
@@ -219,22 +220,32 @@ export default function LoginPage({ onClose }: LoginPageProps) {
 
           {/* Dev fast login — outside the form to avoid required validation */}
           {step === 'email' && isDev && (
-            <div className="mt-3 flex gap-2">
+            <div className="mt-3 flex flex-col gap-2">
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleDevLogin('admin')}
+                  disabled={loading}
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg text-xs font-medium text-amber-400 border border-amber-500/30 bg-amber-500/5 hover:bg-amber-500/10 transition-all disabled:opacity-40"
+                >
+                  <Zap size={14} />
+                  Admin
+                </button>
+                <button
+                  onClick={() => handleDevLogin('client')}
+                  disabled={loading}
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg text-xs font-medium text-sky-400 border border-sky-500/30 bg-sky-500/5 hover:bg-sky-500/10 transition-all disabled:opacity-40"
+                >
+                  <UserCircle size={14} />
+                  Client
+                </button>
+              </div>
               <button
-                onClick={() => handleDevLogin('admin')}
+                onClick={() => handleDevLogin('new')}
                 disabled={loading}
-                className="flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg text-xs font-medium text-amber-400 border border-amber-500/30 bg-amber-500/5 hover:bg-amber-500/10 transition-all disabled:opacity-40"
-              >
-                <Zap size={14} />
-                Admin
-              </button>
-              <button
-                onClick={() => handleDevLogin('client')}
-                disabled={loading}
-                className="flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg text-xs font-medium text-sky-400 border border-sky-500/30 bg-sky-500/5 hover:bg-sky-500/10 transition-all disabled:opacity-40"
+                className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg text-xs font-medium text-green-400 border border-green-500/30 bg-green-500/5 hover:bg-green-500/10 transition-all disabled:opacity-40"
               >
                 <UserCircle size={14} />
-                Client
+                Nouveau client
               </button>
             </div>
           )}

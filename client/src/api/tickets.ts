@@ -104,6 +104,12 @@ export const reorderTickets = (ticketIds: number[]): Promise<{ success: boolean 
     method: 'POST', body: JSON.stringify({ ticketIds }),
   });
 
+// Feedback (public, no auth required)
+export const submitFeedback = (rating: number): Promise<{ ok: boolean }> =>
+  request<{ ok: boolean }>(`${API}/feedback`, {
+    method: 'POST', body: JSON.stringify({ rating }),
+  });
+
 // File locks (project-scoped) & repos
 export const getFileLocks = (): Promise<FileLock[]> => projectRequest<FileLock[]>(`${API}/file-locks`);
 export const getRepos = (): Promise<string[]> => request<string[]>(`${API}/repos`);

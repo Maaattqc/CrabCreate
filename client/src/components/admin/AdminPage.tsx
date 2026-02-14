@@ -1082,6 +1082,7 @@ function LogsTab({ logs, total, loading, category, onCategoryChange, onLoadMore,
     user_plan_change: 'text-purple-400 bg-purple-500/10',
     user_promote_admin: 'text-amber-400 bg-amber-500/10',
     user_demote_admin: 'text-gray-400 bg-gray-500/10',
+    onboard_feedback: 'text-indigo-400 bg-indigo-500/10',
   };
 
   const categories = [
@@ -1090,6 +1091,7 @@ function LogsTab({ logs, total, loading, category, onCategoryChange, onLoadMore,
     { key: 'ticket', label: t.adminLogFilterTicket || 'Tickets', color: 'text-blue-400 border-blue-500/40' },
     { key: 'pipeline', label: t.adminLogFilterPipeline || 'Pipeline', color: 'text-cyan-400 border-cyan-500/40' },
     { key: 'admin', label: t.adminLogFilterAdmin || 'Admin', color: 'text-amber-400 border-amber-500/40' },
+    { key: 'feedback', label: t.adminLogFilterFeedback, color: 'text-indigo-400 border-indigo-500/40' },
   ];
 
   return (

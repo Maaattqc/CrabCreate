@@ -133,6 +133,28 @@ export interface Translations {
   onboardGo: string;
   onboardSkip: string;
   onboardNext: string;
+  onboardQuickTour: string;
+  onboardDemoTitle: string;
+  onboardDemoDesc: string;
+  onboardPipelineRunning: string;
+  onboardPipelineQueued: string;
+  onboardPipelineEstimating: string;
+  onboardPipelineCoding: string;
+  onboardPipelineReview: string;
+  onboardPipelineTesting: string;
+  onboardPipelineDeploying: string;
+  onboardPipelineStaging: string;
+  onboardPipelineWaitApprove: string;
+  onboardPipelineApproved: string;
+  onboardApproveQuestion: string;
+  onboardApproveYes: string;
+  onboardApproveNo: string;
+  onboardCelebrationTitle: string;
+  onboardCelebrationLink: string;
+  onboardCompleteTitle: string;
+  onboardCompleteDesc: string;
+  onboardCompleteBtn: string;
+  onboardFeedbackQuestion: string;
 
   // Auth
   authSubtitle: string;
@@ -306,6 +328,7 @@ export interface Translations {
   adminLogFilterTicket: string;
   adminLogFilterPipeline: string;
   adminLogFilterAdmin: string;
+  adminLogFilterFeedback: string;
 
   // Settings categories
   settingsCatRateLimiting: string;
@@ -780,6 +803,28 @@ export const translations: Record<Lang, Translations> = {
     onboardGo: 'C\'est parti !',
     onboardSkip: 'Passer',
     onboardNext: 'Suivant',
+    onboardQuickTour: 'Tutoriel rapide ~30 sec',
+    onboardDemoTitle: 'Cr\u00e9er un blog',
+    onboardDemoDesc: 'Cr\u00e9er un site avec une page d\u0027accueil et un onglet blog',
+    onboardPipelineRunning: 'Pipeline en cours...',
+    onboardPipelineQueued: 'Mise en file d\'attente...',
+    onboardPipelineEstimating: 'Estimation : {cost}$',
+    onboardPipelineCoding: 'Codage en cours... +{lines} lignes',
+    onboardPipelineReview: 'Code review : {score}/100 \u2713',
+    onboardPipelineTesting: 'Tests automatiques... 12/12 \u2713',
+    onboardPipelineDeploying: 'D\u00e9ploiement sur le serveur...',
+    onboardPipelineStaging: 'V\u00e9rification en cours...',
+    onboardPipelineWaitApprove: 'En attente d\'approbation',
+    onboardPipelineApproved: 'D\u00e9ploy\u00e9 avec succ\u00e8s !',
+    onboardApproveQuestion: 'Approuvez-vous ce d\u00e9ploiement ?',
+    onboardApproveYes: 'Oui, approuver',
+    onboardApproveNo: 'Non, rejeter',
+    onboardCelebrationTitle: 'D\u00e9ploy\u00e9 avec succ\u00e8s !',
+    onboardCelebrationLink: 'main-site.com/blog',
+    onboardCompleteTitle: 'Tutoriel termin\u00e9 !',
+    onboardCompleteDesc: 'Vous pouvez maintenant cr\u00e9er votre premier billet.',
+    onboardCompleteBtn: 'C\'est parti !',
+    onboardFeedbackQuestion: 'Ce tutoriel vous a été utile ?',
 
     authSubtitle: 'Connectez-vous pour accéder au dashboard',
     authEnterEmail: 'Adresse email',
@@ -941,6 +986,7 @@ export const translations: Record<Lang, Translations> = {
     adminLogFilterTicket: 'Tickets',
     adminLogFilterPipeline: 'Pipeline',
     adminLogFilterAdmin: 'Admin',
+    adminLogFilterFeedback: 'Avis Guide',
 
     settingsCatRateLimiting: 'Limites de débit',
     settingsCatIA: 'Intelligence Artificielle',
@@ -1378,6 +1424,28 @@ export const translations: Record<Lang, Translations> = {
     onboardGo: 'Let\'s go!',
     onboardSkip: 'Skip',
     onboardNext: 'Next',
+    onboardQuickTour: 'Quick tour ~30 sec',
+    onboardDemoTitle: 'Create a blog',
+    onboardDemoDesc: 'Create a website with a homepage and a blog tab',
+    onboardPipelineRunning: 'Pipeline running...',
+    onboardPipelineQueued: 'Queuing...',
+    onboardPipelineEstimating: 'Estimating: {cost}$',
+    onboardPipelineCoding: 'Coding... +{lines} lines',
+    onboardPipelineReview: 'Code review: {score}/100 \u2713',
+    onboardPipelineTesting: 'Running tests... 12/12 \u2713',
+    onboardPipelineDeploying: 'Deploying to server...',
+    onboardPipelineStaging: 'Verifying...',
+    onboardPipelineWaitApprove: 'Waiting for approval',
+    onboardPipelineApproved: 'Deployed successfully!',
+    onboardApproveQuestion: 'Do you approve this deployment?',
+    onboardApproveYes: 'Yes, approve',
+    onboardApproveNo: 'No, reject',
+    onboardCelebrationTitle: 'Deployed successfully!',
+    onboardCelebrationLink: 'main-site.com/blog',
+    onboardCompleteTitle: 'Tutorial complete!',
+    onboardCompleteDesc: 'You can now create your first ticket.',
+    onboardCompleteBtn: 'Let\'s go!',
+    onboardFeedbackQuestion: 'Was this tutorial helpful?',
 
     authSubtitle: 'Sign in to access the dashboard',
     authEnterEmail: 'Email address',
@@ -1539,6 +1607,7 @@ export const translations: Record<Lang, Translations> = {
     adminLogFilterTicket: 'Tickets',
     adminLogFilterPipeline: 'Pipeline',
     adminLogFilterAdmin: 'Admin',
+    adminLogFilterFeedback: 'Guide Reviews',
 
     settingsCatRateLimiting: 'Rate Limiting',
     settingsCatIA: 'Artificial Intelligence',

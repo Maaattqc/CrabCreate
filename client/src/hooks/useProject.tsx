@@ -86,8 +86,23 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
 
     setLoading(true);
     (async () => {
-      const list = await refreshProjectsInternal();
+      let list = await refreshProjectsInternal();
       await refreshInvitations();
+
+      // Auto-create a default project if user has none
+      if (list.length === 0) {
+        try {
+          const project = await projectsApi.createProject({
+            name: 'Mon projet',
+            slug: `projet-${userId}`,
+            is_private: 1,
+          });
+          list = [project];
+          setProjects(list);
+        } catch {
+          // ignore — user will see empty state
+        }
+      }
 
       // Restore last used project
       const savedId = localStorage.getItem('crab-current-project');

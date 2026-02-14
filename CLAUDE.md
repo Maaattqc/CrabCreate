@@ -41,6 +41,12 @@ Documentation complete dans le dossier `docs/` :
 - **i18n** : tout texte visible dans l'UI doit etre dans `i18n.ts` (FR + EN).
 - **TypeScript strict** : verifier avec `npx tsc --noEmit` avant de finaliser.
 
+## Conventions UI
+
+- **Pas de date d'echeance a la creation** : le champ `due_date` n'apparait qu'a l'edition du ticket, jamais dans `CreateTicketModal`.
+- **Dollar apres le nombre** : format `49$`, `0$`, pas `$49`. Applique partout dans `i18n.ts`, Header, tests.
+- **`color-scheme` CSS** : toujours mettre `color-scheme: dark` sur `:root` / `[data-theme="dark"]` et `color-scheme: light` sur `[data-theme="light"]` dans `index.css`. Sans ca, les icones natives (calendrier, fleches select, etc.) restent noires en dark mode.
+
 ## Quick Reference
 
 - **Stack** : React 19 + Vite 8 + Tailwind CSS 4 (client) / Node.js + Express 5 (server) / TypeScript / SQLite (better-sqlite3)

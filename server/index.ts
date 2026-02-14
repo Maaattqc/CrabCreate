@@ -14,6 +14,7 @@ import * as repo from './db/repositories';
 
 import authRouter from './routes/auth';
 import contactRouter from './routes/contact';
+import feedbackRouter from './routes/feedback';
 import webhooksRouter from './routes/webhooks';
 import ticketsRouter from './routes/tickets';
 import pipelineRouter from './routes/pipeline';
@@ -99,6 +100,7 @@ app.get('/health', (_req: Request, res: Response) => {
 // Public routes (before requireAuth)
 app.use('/api/auth', authRouter);
 app.use('/api/contact', contactRouter);
+app.use('/api/feedback', feedbackRouter);
 app.use('/api/webhooks', webhooksRouter);
 
 // Public plans config for pricing page

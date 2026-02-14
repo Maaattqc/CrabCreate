@@ -217,6 +217,31 @@ router.post('/dev-login-client', (req: Request, res: Response) => {
   res.json({ user: userResponse(user) });
 });
 
+// POST /api/auth/dev-login-new — development only, create a fresh client each time
+router.post('/dev-login-new', (req: Request, res: Response) => {
+  if (config.nodeEnv === 'production') {
+    res.status(404).json({ error: 'Not found' });
+    return;
+  }
+  if (repo.getConfig('dev_login_enabled') === '0') {
+    res.status(403).json({ error: 'Dev login désactivé par l\'administrateur.' });
+    return;
+  }
+
+  const timestamp = Date.now();
+  const newEmail = `new-client-${timestamp}@crabcreate.dev`;
+  let user = repo.createUser(newEmail);
+  user = repo.findUserById(user.id)!;
+  repo.updateUserLastLogin(user.id);
+
+  const payload: JwtPayload = { userId: user.id, email: user.email };
+  const token = jwt.sign(payload, config.jwtSecret, { algorithm: 'HS512', expiresIn: `${getSessionDurationDays()}d` });
+
+  setAuthCookie(res, token);
+  repo.insertAuditLog(user.id, user.email, 'dev_login', 'user', user.id, 'Dev new client login', req.ip);
+  res.json({ user: userResponse(user) });
+});
+
 // POST /api/auth/logout
 router.post('/logout', (_req: Request, res: Response) => {
   res.clearCookie('crab_token', { path: '/' });
