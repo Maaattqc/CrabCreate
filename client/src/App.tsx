@@ -38,6 +38,7 @@ import { AnimationsProvider } from './hooks/useAnimations';
 import { AIDesignProvider, useAIDesign } from './hooks/useAIDesign';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import { ProjectProvider, useProject } from './hooks/useProject';
+import { LoginModalProvider, useLoginModal } from './hooks/useLoginModal';
 import { getSetupStatus } from './api/project-setup';
 import type { Ticket } from './types';
 
@@ -52,27 +53,7 @@ function PublicLayout({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** Redirects to /dashboard if already authenticated */
-function AuthRedirect({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
-
-  if (loading) {
-    return (
-      <div className="h-screen flex flex-col items-center justify-center" style={{ background: 'var(--bg-gradient)' }}>
-        <div className="text-5xl mb-4 animate-bounce">🦀</div>
-        <p className="text-tx-faint text-sm">...</p>
-      </div>
-    );
-  }
-
-  if (user) {
-    return <Navigate to="/dashboard" replace />;
-  }
-
-  return <>{children}</>;
-}
-
-/** Protects routes — redirects to /login if not authenticated */
+/** Protects routes — redirects to /dashboard if not authenticated */
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const { t } = useLanguage();
@@ -87,14 +68,16 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   }
 
   if (!user) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/dashboard" replace />;
   }
 
   return <>{children}</>;
 }
 
-/** Main dashboard — only mounted after successful auth */
+/** Main dashboard */
 function Dashboard() {
+  const { user } = useAuth();
+  const { openLogin } = useLoginModal();
   const [viewMode, setViewMode] = useState<'board' | 'list' | 'calendar' | 'timeline'>('board');
   const [search, setSearch] = useState('');
   const [showCreate, setShowCreate] = useState(false);
@@ -210,6 +193,7 @@ function Dashboard() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleLaunch = async (id: number) => {
+    if (!user) { openLogin(); return; }
     try {
       // Check if project is configured
       const status = await getSetupStatus();
@@ -273,7 +257,7 @@ function Dashboard() {
 
       <div className="flex-1 flex flex-col overflow-hidden">
         <FileLockBanner />
-        {!projectsLoading && !currentProject ? (
+        {user && !projectsLoading && !currentProject ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-4">
             <div className="text-5xl">📁</div>
             <p className="text-tx-faint text-sm">{t.projectCreateFirst}</p>
@@ -289,7 +273,7 @@ function Dashboard() {
         ) : viewMode === 'timeline' ? (
           <TimelineView tickets={filteredTickets} onTicketClick={handleTicketClick} />
         ) : viewMode === 'board' ? (
-          <KanbanBoard tickets={filteredTickets} onTicketClick={handleTicketClick} onLaunch={handleLaunch} onCreateClick={() => setShowCreate(true)} onReorder={reorder} />
+          <KanbanBoard tickets={filteredTickets} onTicketClick={handleTicketClick} onLaunch={handleLaunch} onCreateClick={() => { if (!user) { openLogin(); return; } setShowCreate(true); }} onReorder={reorder} />
         ) : (
           <ListView tickets={filteredTickets} onTicketClick={handleTicketClick} scoreThresholdGood={appConfig.score_threshold_good} scoreThresholdOk={appConfig.score_threshold_ok} />
         )}
@@ -353,6 +337,45 @@ function Dashboard() {
   );
 }
 
+/** Dashboard with login modal overlay when not authenticated */
+function DashboardWithAuth() {
+  const { user, loading } = useAuth();
+  const { showLogin, closeLogin } = useLoginModal();
+  const { t } = useLanguage();
+  const [dismissed, setDismissed] = useState(false);
+
+  const handleClose = () => {
+    setDismissed(true);
+    closeLogin();
+  };
+
+  // Show modal: on first load if not auth'd (until dismissed), or when triggered by action
+  const showModal = !user && (showLogin || !dismissed);
+
+  if (loading) {
+    return (
+      <div className="h-screen flex flex-col items-center justify-center" style={{ background: 'var(--bg-gradient)' }}>
+        <div className="text-5xl mb-4 animate-bounce">🦀</div>
+        <p className="text-tx-faint text-sm">{t.authLoading}</p>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <Dashboard />
+      {showModal && (
+        <>
+          <div className="fixed inset-0 z-40 bg-black/20 backdrop-blur-[2px]" />
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <LoginPage onClose={handleClose} />
+          </div>
+        </>
+      )}
+    </>
+  );
+}
+
 function AppRoutes() {
   const location = useLocation();
   return (
@@ -362,8 +385,8 @@ function AppRoutes() {
       <Route path="/contact" element={<PublicLayout><ContactPage /></PublicLayout>} />
       <Route path="/legal" element={<PublicLayout><LegalPage /></PublicLayout>} />
       <Route path="/privacy" element={<PublicLayout><PrivacyPage /></PublicLayout>} />
-      <Route path="/login" element={<AuthRedirect><LoginPage /></AuthRedirect>} />
-      <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+      <Route path="/login" element={<Navigate to="/dashboard" replace />} />
+      <Route path="/dashboard" element={<DashboardWithAuth />} />
       <Route path="/admin" element={<ProtectedRoute><AdminPage /></ProtectedRoute>} />
       <Route path="*" element={<PublicLayout><NotFoundPage /></PublicLayout>} />
     </Routes>
@@ -377,9 +400,11 @@ export default function App() {
         <AIDesignProvider>
           <LanguageProvider>
             <AuthProvider>
-              <ProjectProvider>
-                <AppRoutes />
-              </ProjectProvider>
+              <LoginModalProvider>
+                <ProjectProvider>
+                  <AppRoutes />
+                </ProjectProvider>
+              </LoginModalProvider>
             </AuthProvider>
           </LanguageProvider>
         </AIDesignProvider>

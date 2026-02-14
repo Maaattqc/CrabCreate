@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Mail, ArrowRight, Loader2, ArrowLeft, Check, ShieldCheck, Zap, UserCircle } from 'lucide-react';
+import { Mail, ArrowRight, Loader2, ArrowLeft, Check, ShieldCheck, Zap, UserCircle, X } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useLanguage } from '../../hooks/useLanguage';
 import type { AuthUser } from '../../hooks/useAuth';
@@ -9,10 +8,13 @@ const isDev = import.meta.env.DEV;
 
 type Step = 'email' | 'code' | 'success';
 
-export default function LoginPage() {
+interface LoginPageProps {
+  onClose?: () => void;
+}
+
+export default function LoginPage({ onClose }: LoginPageProps) {
   const { requestCode, verifyCode, activateSession } = useAuth();
   const { t } = useLanguage();
-  const navigate = useNavigate();
   const [step, setStep] = useState<Step>('email');
   const [email, setEmail] = useState('');
   const [code, setCode] = useState(['', '', '', '', '', '']);
@@ -98,12 +100,11 @@ export default function LoginPage() {
       setVerifiedUser(user);
       setStep('success');
 
-      // Show success for 1.4s, then fade out, then activate + navigate
+      // Show success for 1.4s, then fade out, then activate (ProtectedRoute re-renders)
       setTimeout(() => {
         setFadeOut(true);
         setTimeout(() => {
           activateSession(user);
-          navigate('/dashboard');
         }, 500);
       }, 1400);
     } catch (err) {
@@ -127,7 +128,6 @@ export default function LoginPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Dev login failed');
       activateSession(data.user);
-      navigate('/dashboard');
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -145,10 +145,7 @@ export default function LoginPage() {
   const isSuccess = step === 'success';
 
   return (
-    <div
-      className={`min-h-screen flex items-center justify-center p-4 transition-all duration-500 ${fadeOut ? 'opacity-0 scale-105' : 'opacity-100 scale-100'}`}
-      style={{ background: 'var(--bg-gradient)' }}
-    >
+    <div className={`w-full max-w-md transition-all duration-500 ${fadeOut ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}`}>
       {/* Ambient glow behind the card */}
       <div className="fixed inset-0 flex items-center justify-center pointer-events-none">
         <div
@@ -158,24 +155,34 @@ export default function LoginPage() {
         />
       </div>
 
-      <div className="w-full max-w-sm relative z-10">
-        {/* Logo */}
-        <div className="text-center mb-8">
-          <div className={`text-6xl mb-3 transition-all duration-700 ${isSuccess ? 'scale-110' : ''}`}>
-            🦀
-          </div>
-          <h1 className="text-2xl font-extrabold bg-gradient-to-r from-amber-300 via-orange-400 to-rose-400 bg-clip-text text-transparent font-display tracking-tight">
-            CrabCreate
-          </h1>
-          <p className={`text-sm mt-2 transition-colors duration-500 ${isSuccess ? 'text-green-400' : 'text-tx-faint'}`}>
-            {isSuccess ? t.authVerified : t.authSubtitle}
-          </p>
-        </div>
-
+      <div className="relative z-10">
         {/* Card */}
-        <div className={`bg-surface border rounded-2xl shadow-2xl shadow-black/40 p-8 transition-all duration-500 ${
+        <div className={`bg-surface border-2 rounded-2xl shadow-2xl shadow-black/50 p-10 transition-all duration-500 relative ${
           isSuccess ? 'border-green-500/40' : 'border-th-border-strong'
         }`}>
+
+          {/* Close button */}
+          {onClose && !isSuccess && (
+            <button
+              onClick={onClose}
+              className="absolute top-4 right-4 p-1.5 rounded-lg text-tx-faint hover:text-tx-primary hover:bg-subtle-hover transition-colors"
+            >
+              <X size={18} />
+            </button>
+          )}
+
+          {/* Logo */}
+          <div className="text-center mb-8">
+            <div className={`text-6xl mb-3 transition-all duration-700 ${isSuccess ? 'scale-110' : ''}`}>
+              🦀
+            </div>
+            <h1 className="text-2xl font-extrabold bg-gradient-to-r from-amber-300 via-orange-400 to-rose-400 bg-clip-text text-transparent font-display tracking-tight">
+              CrabCreate
+            </h1>
+            <p className={`text-sm mt-2 transition-colors duration-500 ${isSuccess ? 'text-green-400' : 'text-tx-faint'}`}>
+              {isSuccess ? t.authVerified : t.authSubtitle}
+            </p>
+          </div>
 
           {/* ── Email step ── */}
           {step === 'email' && (

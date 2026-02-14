@@ -7,6 +7,7 @@ import { useAnimations } from '../../hooks/useAnimations';
 import { useAIDesign } from '../../hooks/useAIDesign';
 import { useAuth } from '../../hooks/useAuth';
 import { useProject } from '../../hooks/useProject';
+import { useLoginModal } from '../../hooks/useLoginModal';
 import PresenceAvatars from './PresenceAvatars';
 import NotificationBell from './NotificationBell';
 import type { Ticket, PresenceUser } from '../../types';
@@ -84,6 +85,7 @@ export default function Header({ search, onSearchChange, viewMode, onViewModeCha
   const { animations, setAnimations } = useAnimations();
   const { aiDesign, setAIDesign } = useAIDesign();
   const { user, logout, updatePreferences } = useAuth();
+  const { openLogin } = useLoginModal();
   const { projects, currentProject, invitations, switchProject } = useProject();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -214,10 +216,10 @@ export default function Header({ search, onSearchChange, viewMode, onViewModeCha
       {/* Usage stats */}
       {stats && (
         <div className="hidden lg:flex items-center gap-5 text-sm">
-          <span className="text-tx-muted">{t.credit} <span className="font-mono font-semibold text-amber-400 anim-stat">${aiDesign ? animCost.toFixed(2) : stats.totalCost.toFixed(2)}</span><span className="text-tx-faint">/100$</span></span>
+          <span className="text-tx-muted">{t.credit} <span className="font-mono font-semibold text-amber-400 anim-stat">{aiDesign ? animCost.toFixed(2) : stats.totalCost.toFixed(2)}$</span><span className="text-tx-faint">/100$</span></span>
           <span className="text-tx-muted">{t.tokens} <span className="font-mono font-semibold text-tx-secondary">{aiDesign ? fmt(animTokens) : fmt(stats.totalTokens)}</span></span>
           <span className="text-tx-muted">{t.lines} <span className="font-mono font-semibold text-tx-secondary">{aiDesign ? fmt(animLines) : fmt(stats.totalLines)}</span></span>
-          <span className="text-tx-muted">{t.score} <span className={`font-mono font-semibold ${stats.avgScore == null ? 'text-tx-faint' : stats.avgScore >= 70 ? 'text-green-400' : stats.avgScore >= 50 ? 'text-amber-400' : 'text-red-400'}`}>{stats.avgScore != null ? stats.avgScore + '/100' : 'â€”'}</span></span>
+          <span className="text-tx-muted">{t.score} <span className={`font-mono font-semibold ${stats.avgScore == null ? 'text-tx-faint' : stats.avgScore >= 70 ? 'text-green-400' : stats.avgScore >= 50 ? 'text-amber-400' : 'text-red-400'}`}>{stats.avgScore != null ? stats.avgScore + '/100' : '—'}</span></span>
         </div>
       )}
 
@@ -327,6 +329,17 @@ export default function Header({ search, onSearchChange, viewMode, onViewModeCha
           </div>
         )}
       </div>
+
+      {/* Login button for visitors */}
+      {!user && (
+        <button
+          onClick={openLogin}
+          className="flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm font-medium text-white bg-gradient-to-r from-amber-500 to-red-500 hover:from-amber-400 hover:to-red-400 shadow-lg shadow-orange-500/20 transition-all active:scale-[0.98]"
+        >
+          <User size={14} />
+          {t.navLogin}
+        </button>
+      )}
 
       {/* User menu */}
       {user && (
