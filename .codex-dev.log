@@ -1,0 +1,232 @@
+
+> dev
+> concurrently "cd server && npm run dev" "cd client && npm run dev"
+
+[0] 
+[0] > dev
+[0] > tsx watch index.ts
+[0] 
+[1] 
+[1] > client@0.0.0 dev
+[1] > vite
+[1] 
+[1] [2m17 h 50 min 49 s[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m Re-optimizing dependencies because lockfile has changed
+[1] 
+[1]   [32m[1mVITE[22m v6.4.1[39m  [2mready in [0m[1m493[22m[2m[0m ms[22m
+[1] 
+[1]   [32m➜[39m  [1mLocal[22m:   [36mhttp://localhost:[1m5173[22m/[39m
+[1] [2m  [32m➜[39m  [1mNetwork[22m[2m: use [22m[1m--host[22m[2m to expose[22m
+[0] [dotenv@17.2.4] injecting env (23) from ..\.env -- tip: 📡 add observability to secrets: https://dotenvx.com/ops
+[0] [DB] Migrations completed
+[0] [2026-02-13T22:50:51.261Z] [INFO] [Queue] Polling started (every 5000ms)
+[0] [2026-02-13T22:50:51.272Z] [INFO] CrabCreate running on http://localhost:3000
+[0] [2026-02-13T22:50:51.275Z] [INFO] Environment: development
+[1] [2m17 h 51 min 02 s[22m [31m[1m[vite][22m[39m [31mws proxy socket error:[39m
+[1] Error: write ECONNABORTED
+[1]     at afterWriteDispatched (node:internal/stream_base_commons:160:15)
+[1]     at writeGeneric (node:internal/stream_base_commons:151:3)
+[1]     at Socket._writeGeneric (node:net:952:11)
+[1]     at Socket._write (node:net:964:8)
+[1]     at writeOrBuffer (node:internal/streams/writable:564:12)
+[1]     at _write (node:internal/streams/writable:493:10)
+[1]     at Writable.write (node:internal/streams/writable:502:10)
+[1]     at Socket.ondata (node:internal/streams/readable:1007:22)
+[1]     at Socket.emit (node:events:518:28)
+[1]     at addChunk (node:internal/streams/readable:559:12)
+[1]     at readableAddChunkPushByteMode (node:internal/streams/readable:510:3)
+[1]     at Readable.push (node:internal/streams/readable:390:5)
+[1]     at TCP.onStreamRead (node:internal/stream_base_commons:190:23)
+[0] [2026-02-13T22:51:02.131Z] [INFO] [Socket] Client connected: jIYO-De99ny412L4AAAC (mathieufournierqc@outlook.com)
+[1] [2m17 h 52 min 15 s[22m [31m[1m[vite][22m[39m [31mws proxy socket error:[39m
+[1] Error: write ECONNABORTED
+[1]     at afterWriteDispatched (node:internal/stream_base_commons:160:15)
+[1]     at writeGeneric (node:internal/stream_base_commons:151:3)
+[1]     at Socket._writeGeneric (node:net:952:11)
+[1]     at Socket._write (node:net:964:8)
+[1]     at writeOrBuffer (node:internal/streams/writable:564:12)
+[1]     at _write (node:internal/streams/writable:493:10)
+[1]     at Writable.write (node:internal/streams/writable:502:10)
+[1]     at Socket.ondata (node:internal/streams/readable:1007:22)
+[1]     at Socket.emit (node:events:518:28)
+[1]     at addChunk (node:internal/streams/readable:559:12)
+[1]     at readableAddChunkPushByteMode (node:internal/streams/readable:510:3)
+[1]     at Readable.push (node:internal/streams/readable:390:5)
+[1]     at TCP.onStreamRead (node:internal/stream_base_commons:190:23)
+[0] [2026-02-13T22:52:15.931Z] [INFO] [Socket] Client connected: PEBfzmGJ-xz2o4AKAAAF (mathieufournierqc@outlook.com)
+[0] [2026-02-13T22:52:15.998Z] [INFO] [Socket] Client connected: q-w4CpX0Dt6GjY7QAAAJ (mathieufournierqc@outlook.com)
+[0] [2026-02-13T22:52:16.003Z] [INFO] [Socket] Client connected: 1bTC2B2tvpHQy0M_AAAK (mathieufournierqc@outlook.com)
+[0] [2026-02-13T22:52:16.023Z] [INFO] [Socket] Client connected: z3o4dxtYhM2cwnRdAAAL (mathieufournierqc@outlook.com)
+[1] [2m17 h 52 min 16 s[22m [31m[1m[vite][22m[39m [31mws proxy socket error:[39m
+[1] Error: write ECONNABORTED
+[1]     at afterWriteDispatched (node:internal/stream_base_commons:160:15)
+[1]     at writeGeneric (node:internal/stream_base_commons:151:3)
+[1]     at Socket._writeGeneric (node:net:952:11)
+[1]     at Socket._write (node:net:964:8)
+[1]     at writeOrBuffer (node:internal/streams/writable:564:12)
+[1]     at _write (node:internal/streams/writable:493:10)
+[1]     at Writable.write (node:internal/streams/writable:502:10)
+[1]     at Socket.ondata (node:internal/streams/readable:1007:22)
+[1]     at Socket.emit (node:events:518:28)
+[1]     at addChunk (node:internal/streams/readable:559:12)
+[1]     at readableAddChunkPushByteMode (node:internal/streams/readable:510:3)
+[1]     at Readable.push (node:internal/streams/readable:390:5)
+[1]     at TCP.onStreamRead (node:internal/stream_base_commons:190:23)
+[0] [2026-02-13T22:52:16.179Z] [INFO] [Socket] Client connected: hI1YKEG17tlpq2MaAAAO (mathieufournierqc@outlook.com)
+[0] [2026-02-13T22:52:22.886Z] [INFO] [Socket] Client disconnected: 1bTC2B2tvpHQy0M_AAAK
+[0] [2026-02-13T22:52:22.889Z] [INFO] [Socket] Client disconnected: z3o4dxtYhM2cwnRdAAAL
+[0] [2026-02-13T22:52:22.891Z] [INFO] [Socket] Client disconnected: hI1YKEG17tlpq2MaAAAO
+[0] [2026-02-13T22:52:22.893Z] [INFO] [Socket] Client disconnected: PEBfzmGJ-xz2o4AKAAAF
+[0] [2026-02-13T22:52:22.896Z] [INFO] [Socket] Client disconnected: q-w4CpX0Dt6GjY7QAAAJ
+[0] [2026-02-13T22:52:25.029Z] [INFO] [Socket] Client connected: RWyk5FQQ5C_J0yMIAAAR (mathieufournierqc@outlook.com)
+[0] [2026-02-13T22:52:25.049Z] [INFO] [Socket] Client connected: w2jvj7djJCQmbZB0AAAT (mathieufournierqc@outlook.com)
+[0] [2026-02-13T22:52:25.090Z] [INFO] [Socket] Client connected: PKaPzSpDUzapHMbDAAAV (mathieufournierqc@outlook.com)
+[0] [2026-02-13T22:52:25.094Z] [INFO] [Socket] Client connected: gQwoAFikzUxnKDaGAAAW (mathieufournierqc@outlook.com)
+[1] [2m17 h 52 min 25 s[22m [31m[1m[vite][22m[39m [31mws proxy socket error:[39m
+[1] Error: write ECONNABORTED
+[1]     at afterWriteDispatched (node:internal/stream_base_commons:160:15)
+[1]     at writeGeneric (node:internal/stream_base_commons:151:3)
+[1]     at Socket._writeGeneric (node:net:952:11)
+[1]     at Socket._write (node:net:964:8)
+[1]     at writeOrBuffer (node:internal/streams/writable:564:12)
+[1]     at _write (node:internal/streams/writable:493:10)
+[1]     at Writable.write (node:internal/streams/writable:502:10)
+[1]     at Socket.ondata (node:internal/streams/readable:1007:22)
+[1]     at Socket.emit (node:events:518:28)
+[1]     at addChunk (node:internal/streams/readable:559:12)
+[1]     at readableAddChunkPushByteMode (node:internal/streams/readable:510:3)
+[1]     at Readable.push (node:internal/streams/readable:390:5)
+[1]     at TCP.onStreamRead (node:internal/stream_base_commons:190:23)
+[0] [2026-02-13T22:52:25.213Z] [INFO] [Socket] Client connected: hO5MUFrmRqVJiy3DAAAZ (mathieufournierqc@outlook.com)
+[0] [2026-02-13T22:52:27.438Z] [INFO] [Socket] Client disconnected: jIYO-De99ny412L4AAAC
+[0] [2026-02-13T22:52:27.444Z] [INFO] [Socket] Client disconnected: RWyk5FQQ5C_J0yMIAAAR
+[1] [2m17 h 52 min 27 s[22m [31m[1m[vite][22m[39m [31mws proxy socket error:[39m
+[1] Error: read ECONNRESET
+[1]     at TCP.onStreamRead (node:internal/stream_base_commons:217:20)
+[1] [2m17 h 52 min 27 s[22m [31m[1m[vite][22m[39m [31mws proxy socket error:[39m
+[1] Error: read ECONNRESET
+[1]     at TCP.onStreamRead (node:internal/stream_base_commons:217:20)
+[0] [2026-02-13T22:52:27.448Z] [INFO] [Socket] Client disconnected: w2jvj7djJCQmbZB0AAAT
+[0] [2026-02-13T22:52:27.450Z] [INFO] [Socket] Client disconnected: gQwoAFikzUxnKDaGAAAW
+[0] [2026-02-13T22:52:27.454Z] [INFO] [Socket] Client disconnected: hO5MUFrmRqVJiy3DAAAZ
+[0] [2026-02-13T22:52:27.455Z] [INFO] [Socket] Client disconnected: PKaPzSpDUzapHMbDAAAV
+[0] [2026-02-13T22:52:28.743Z] [INFO] [Socket] Client connected: VcaX6TlZSFmuX-qLAAAc (mathieufournierqc@outlook.com)
+[1] [2m17 h 53 min 27 s[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/index.css[22m
+[1] [2m17 h 53 min 37 s[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/index.css[22m
+[0] [2026-02-13T22:58:23.067Z] [INFO] [Socket] Client disconnected: VcaX6TlZSFmuX-qLAAAc
+[1] [2m17 h 58 min 24 s[22m [31m[1m[vite][22m[39m [31mws proxy socket error:[39m
+[1] Error: write ECONNABORTED
+[1]     at afterWriteDispatched (node:internal/stream_base_commons:160:15)
+[1]     at writeGeneric (node:internal/stream_base_commons:151:3)
+[1]     at Socket._writeGeneric (node:net:952:11)
+[1]     at Socket._write (node:net:964:8)
+[1]     at writeOrBuffer (node:internal/streams/writable:564:12)
+[1]     at _write (node:internal/streams/writable:493:10)
+[1]     at Writable.write (node:internal/streams/writable:502:10)
+[1]     at Socket.ondata (node:internal/streams/readable:1007:22)
+[1]     at Socket.emit (node:events:518:28)
+[1]     at addChunk (node:internal/streams/readable:559:12)
+[1]     at readableAddChunkPushByteMode (node:internal/streams/readable:510:3)
+[1]     at Readable.push (node:internal/streams/readable:390:5)
+[1]     at TCP.onStreamRead (node:internal/stream_base_commons:190:23)
+[0] [2026-02-13T22:58:24.479Z] [INFO] [Socket] Client connected: Np6J-_y_8b6I7adHAAAf (mathieufournierqc@outlook.com)
+[0] [2026-02-13T22:58:27.045Z] [INFO] [Socket] Client disconnected: Np6J-_y_8b6I7adHAAAf
+[0] [2026-02-13T22:58:27.838Z] [INFO] [Socket] Client connected: 8G_G9BFFH3Pz9OcyAAAi (mathieufournierqc@outlook.com)
+[1] [2m18 h 00 min 53 s[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/index.css[22m
+[0] [2026-02-13T23:06:34.985Z] [INFO] [Socket] Client disconnected: 8G_G9BFFH3Pz9OcyAAAi
+[1] [2m18 h 06 min 36 s[22m [31m[1m[vite][22m[39m [31mws proxy socket error:[39m
+[1] Error: write ECONNABORTED
+[1]     at afterWriteDispatched (node:internal/stream_base_commons:160:15)
+[1]     at writeGeneric (node:internal/stream_base_commons:151:3)
+[1]     at Socket._writeGeneric (node:net:952:11)
+[1]     at Socket._write (node:net:964:8)
+[1]     at writeOrBuffer (node:internal/streams/writable:564:12)
+[1]     at _write (node:internal/streams/writable:493:10)
+[1]     at Writable.write (node:internal/streams/writable:502:10)
+[1]     at Socket.ondata (node:internal/streams/readable:1007:22)
+[1]     at Socket.emit (node:events:518:28)
+[1]     at addChunk (node:internal/streams/readable:559:12)
+[1]     at readableAddChunkPushByteMode (node:internal/streams/readable:510:3)
+[1]     at Readable.push (node:internal/streams/readable:390:5)
+[1]     at TCP.onStreamRead (node:internal/stream_base_commons:190:23)
+[0] [2026-02-13T23:06:36.160Z] [INFO] [Socket] Client connected: O3nNWGr4Pjeu5Fr9AAAl (mathieufournierqc@outlook.com)
+[0] [2026-02-13T23:06:41.631Z] [INFO] [Socket] Client disconnected: O3nNWGr4Pjeu5Fr9AAAl
+[1] [2m18 h 06 min 42 s[22m [31m[1m[vite][22m[39m [31mws proxy socket error:[39m
+[1] Error: write ECONNABORTED
+[1]     at afterWriteDispatched (node:internal/stream_base_commons:160:15)
+[1]     at writeGeneric (node:internal/stream_base_commons:151:3)
+[1]     at Socket._writeGeneric (node:net:952:11)
+[1]     at Socket._write (node:net:964:8)
+[1]     at writeOrBuffer (node:internal/streams/writable:564:12)
+[1]     at _write (node:internal/streams/writable:493:10)
+[1]     at Writable.write (node:internal/streams/writable:502:10)
+[1]     at Socket.ondata (node:internal/streams/readable:1007:22)
+[1]     at Socket.emit (node:events:518:28)
+[1]     at addChunk (node:internal/streams/readable:559:12)
+[1]     at readableAddChunkPushByteMode (node:internal/streams/readable:510:3)
+[1]     at Readable.push (node:internal/streams/readable:390:5)
+[1]     at TCP.onStreamRead (node:internal/stream_base_commons:190:23)
+[0] [2026-02-13T23:06:42.603Z] [INFO] [Socket] Client connected: Vd7QY_vZAr3xz-H2AAAo (mathieufournierqc@outlook.com)
+[1] [2m18 h 07 min 45 s[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/public/LandingPage.tsx, /src/index.css[22m
+[1] [2m18 h 07 min 51 s[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/index.css[22m
+[0] [2026-02-13T23:07:56.234Z] [INFO] [Socket] Client disconnected: Vd7QY_vZAr3xz-H2AAAo
+[1] [2m18 h 07 min 57 s[22m [31m[1m[vite][22m[39m [31mws proxy socket error:[39m
+[1] Error: write ECONNABORTED
+[1]     at afterWriteDispatched (node:internal/stream_base_commons:160:15)
+[1]     at writeGeneric (node:internal/stream_base_commons:151:3)
+[1]     at Socket._writeGeneric (node:net:952:11)
+[1]     at Socket._write (node:net:964:8)
+[1]     at writeOrBuffer (node:internal/streams/writable:564:12)
+[1]     at _write (node:internal/streams/writable:493:10)
+[1]     at Writable.write (node:internal/streams/writable:502:10)
+[1]     at Socket.ondata (node:internal/streams/readable:1007:22)
+[1]     at Socket.emit (node:events:518:28)
+[1]     at addChunk (node:internal/streams/readable:559:12)
+[1]     at readableAddChunkPushByteMode (node:internal/streams/readable:510:3)
+[1]     at Readable.push (node:internal/streams/readable:390:5)
+[1]     at TCP.onStreamRead (node:internal/stream_base_commons:190:23)
+[0] [2026-02-13T23:07:57.818Z] [INFO] [Socket] Client connected: Up2mWMt50zkDTDUbAAAr (mathieufournierqc@outlook.com)
+[1] [2m18 h 09 min 09 s[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/public/LandingPage.tsx, /src/index.css[22m
+[1] [2m18 h 09 min 14 s[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/public/PublicNavbar.tsx, /src/index.css[22m
+[1] [2m18 h 09 min 19 s[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/public/Footer.tsx, /src/index.css[22m
+[1] [2m18 h 10 min 01 s[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/layout/Header.tsx, /src/index.css[22m
+[1] [2m18 h 10 min 12 s[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/layout/Header.tsx, /src/index.css[22m
+[1] [2m18 h 10 min 30 s[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/index.css[22m
+[1] [2m18 h 12 min 16 s[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/index.css[22m
+[1] [2m18 h 15 min 55 s[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/public/LandingPage.tsx, /src/index.css[22m
+[1] [2m18 h 16 min 05 s[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/public/LandingPage.tsx, /src/index.css[22m
+[1] [2m18 h 16 min 30 s[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/public/LandingPage.tsx, /src/index.css[22m
+[1] [2m18 h 16 min 38 s[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/public/LandingPage.tsx, /src/index.css[22m
+[1] [2m18 h 16 min 44 s[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/public/LandingPage.tsx, /src/index.css[22m
+[1] [2m18 h 17 min 00 s[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/public/LandingPage.tsx, /src/index.css[22m
+[1] [2m18 h 17 min 31 s[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/public/LandingPage.tsx, /src/index.css[22m
+[1] [2m18 h 18 min 02 s[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/public/LandingPage.tsx, /src/index.css[22m
+[0] [2026-02-13T23:21:12.386Z] [INFO] [Socket] Client disconnected: Up2mWMt50zkDTDUbAAAr
+[0] [2026-02-13T23:21:13.826Z] [INFO] [Socket] Client connected: Z9HdNQy5iQnrdfGjAAAu (mathieufournierqc@outlook.com)
+[0] [2026-02-13T23:21:20.134Z] [INFO] [Socket] Client disconnected: Z9HdNQy5iQnrdfGjAAAu
+[1] [2m18 h 21 min 21 s[22m [31m[1m[vite][22m[39m [31mws proxy socket error:[39m
+[1] Error: write ECONNABORTED
+[1]     at afterWriteDispatched (node:internal/stream_base_commons:160:15)
+[1]     at writeGeneric (node:internal/stream_base_commons:151:3)
+[1]     at Socket._writeGeneric (node:net:952:11)
+[1]     at Socket._write (node:net:964:8)
+[1]     at writeOrBuffer (node:internal/streams/writable:564:12)
+[1]     at _write (node:internal/streams/writable:493:10)
+[1]     at Writable.write (node:internal/streams/writable:502:10)
+[1]     at Socket.ondata (node:internal/streams/readable:1007:22)
+[1]     at Socket.emit (node:events:518:28)
+[1]     at addChunk (node:internal/streams/readable:559:12)
+[1]     at readableAddChunkPushByteMode (node:internal/streams/readable:510:3)
+[1]     at Readable.push (node:internal/streams/readable:390:5)
+[1]     at TCP.onStreamRead (node:internal/stream_base_commons:190:23)
+[0] [2026-02-13T23:21:21.065Z] [INFO] [Socket] Client connected: fvpoYlGAPo3JZ4izAAAx (mathieufournierqc@outlook.com)
+[1] [2m18 h 22 min 08 s[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/public/LandingPage.tsx, /src/index.css[22m
+[1] [2m18 h 23 min 11 s[22m [31m[1m[vite][22m[39m [31mws proxy error:[39m
+[1] Error: read ECONNRESET
+[1]     at TCP.onStreamRead (node:internal/stream_base_commons:217:20)
+[1] ^C
+[0] ^C
+[1] ^CTerminer le programme de commandes (O/N)�? 
+[0] ^CTerminer le programme de commandes (O/N)�? 
+[1] cd client && npm run dev exited with code 3221225786
+[0] cd server && npm run dev exited with code 3221225786
+^C

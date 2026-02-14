@@ -1,0 +1,19 @@
+node_modules/
+.env
+db-docs/
+client/dist/
+repos/
+
+# SQLite
+*.db
+*.db-shm
+*.db-wal
+
+# Windows artifacts
+nul
+
+# Logs
+server/logs/
+
+# Claude Code
+.claude/

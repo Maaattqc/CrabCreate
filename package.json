@@ -1,0 +1,13 @@
+{
+  "name": "crab-create",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"cd server && npm run dev\" \"cd client && npm run dev\"",
+    "build": "cd client && npm run build",
+    "start": "cd server && node index.js",
+    "db:migrate": "cd server && node -e \"require('./db/migrations').migrate()\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}
