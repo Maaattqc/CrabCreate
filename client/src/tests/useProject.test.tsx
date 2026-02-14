@@ -142,9 +142,16 @@ describe('useProject', () => {
     expect(result.current.currentProject).toEqual(mockProject);
   });
 
-  it('handles empty project list', async () => {
+  it('auto-creates a default project when list is empty', async () => {
+    const autoProject: Project = {
+      ...mockProject,
+      id: 10,
+      name: 'Mon projet',
+      slug: 'projet-1',
+    };
     vi.mocked(projectsApi.getProjects).mockResolvedValue([]);
     vi.mocked(projectsApi.getMyInvitations).mockResolvedValue([]);
+    vi.mocked(projectsApi.createProject).mockResolvedValue(autoProject);
 
     const { result } = renderHook(() => useProject(), { wrapper });
 
@@ -152,8 +159,13 @@ describe('useProject', () => {
       expect(result.current.loading).toBe(false);
     });
 
-    expect(result.current.projects).toHaveLength(0);
-    expect(result.current.currentProject).toBeNull();
+    expect(projectsApi.createProject).toHaveBeenCalledWith({
+      name: 'Mon projet',
+      slug: 'projet-1',
+      is_private: 1,
+    });
+    expect(result.current.projects).toHaveLength(1);
+    expect(result.current.currentProject).toEqual(autoProject);
   });
 
   it('loads invitations on mount', async () => {
@@ -294,9 +306,10 @@ describe('useProject', () => {
     expect(result.current.invitations).toHaveLength(0);
   });
 
-  it('handles API errors gracefully for getProjects', async () => {
+  it('handles API errors gracefully for getProjects (auto-create also fails)', async () => {
     vi.mocked(projectsApi.getProjects).mockRejectedValue(new Error('Network error'));
     vi.mocked(projectsApi.getMyInvitations).mockResolvedValue([]);
+    vi.mocked(projectsApi.createProject).mockRejectedValue(new Error('Network error'));
 
     const { result } = renderHook(() => useProject(), { wrapper });
 

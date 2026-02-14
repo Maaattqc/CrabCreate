@@ -61,22 +61,25 @@ describe('App routing', () => {
     });
   });
 
-  it('/login renders LoginPage when not authenticated', async () => {
+  it('/login redirects to /dashboard and shows login overlay', async () => {
     renderAtRoute('/login');
 
     await waitFor(() => {
-      // LoginPage shows CrabCreate title and auth subtitle
-      expect(screen.getByText('CrabCreate')).toBeInTheDocument();
+      // /login redirects to /dashboard which shows the dashboard with login modal overlay
+      // "CrabCreate" appears in both the header and the login modal
+      const matches = screen.getAllByText('CrabCreate');
+      expect(matches.length).toBeGreaterThanOrEqual(2);
       expect(screen.getByText(/Connectez-vous pour accéder au dashboard/)).toBeInTheDocument();
     });
   });
 
-  it('/dashboard redirects to /login when not authenticated', async () => {
+  it('/dashboard shows login overlay when not authenticated', async () => {
     renderAtRoute('/dashboard');
 
     await waitFor(() => {
-      // ProtectedRoute redirects to /login, which renders LoginPage
-      expect(screen.getByText('CrabCreate')).toBeInTheDocument();
+      // DashboardWithAuth shows dashboard + login modal overlay for unauthenticated users
+      const matches = screen.getAllByText('CrabCreate');
+      expect(matches.length).toBeGreaterThanOrEqual(2);
       expect(screen.getByText(/Connectez-vous pour accéder au dashboard/)).toBeInTheDocument();
     });
   });
