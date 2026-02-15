@@ -64,9 +64,21 @@ function resolveProjectRepo(projectId: number, requestedRepo: unknown): string |
   return normalized === projectRepoId ? projectRepoId : null;
 }
 
+function stringParam(val: unknown): string | undefined {
+  return typeof val === 'string' ? val : undefined;
+}
+
 // GET /api/tickets -- List tickets (scoped to project)
 router.get('/', (req: Request, res: Response) => {
-  const filters = req.query as Record<string, string>;
+  const filters: Record<string, string> = {};
+  const q = req.query;
+  if (stringParam(q.status)) filters.status = stringParam(q.status)!;
+  if (stringParam(q.priority)) filters.priority = stringParam(q.priority)!;
+  if (stringParam(q.template)) filters.template = stringParam(q.template)!;
+  if (stringParam(q.repo)) filters.repo = stringParam(q.repo)!;
+  if (stringParam(q.assignee)) filters.assignee = stringParam(q.assignee)!;
+  if (stringParam(q.tag)) filters.tag = stringParam(q.tag)!;
+  if (stringParam(q.search)) filters.search = stringParam(q.search)!;
   const projectId = req.project!.id;
   const tickets = repo.findAllTickets(filters, undefined, projectId);
   res.json(tickets);

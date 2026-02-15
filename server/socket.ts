@@ -21,6 +21,42 @@ function parseCookies(header: string): Record<string, string> {
 
 let io: Server | null = null;
 
+// ── Per-socket event throttle (SEC-001) ──────────────────────────────────────
+const THROTTLE_MS: Record<string, number> = {
+  'cursor:move': 50,        // 20 updates/sec max
+  'cursor:leave': 200,
+  'ticket:typing': 1000,    // 1/sec
+  'ticket:stop-typing': 1000,
+  'ticket:editing': 500,
+  'ticket:stop-editing': 500,
+  'ticket:view': 500,
+  'ticket:unview': 500,
+  'ticket:drag-start': 300,
+  'ticket:drag-end': 300,
+  'user:status': 2000,      // 1 per 2sec
+};
+
+const socketLastEmit = new Map<string, Map<string, number>>();
+
+function isThrottled(socketId: string, event: string): boolean {
+  const limit = THROTTLE_MS[event];
+  if (!limit) return false;
+  const now = Date.now();
+  let socketMap = socketLastEmit.get(socketId);
+  if (!socketMap) {
+    socketMap = new Map();
+    socketLastEmit.set(socketId, socketMap);
+  }
+  const last = socketMap.get(event) || 0;
+  if (now - last < limit) return true;
+  socketMap.set(event, now);
+  return false;
+}
+
+function cleanupThrottle(socketId: string): void {
+  socketLastEmit.delete(socketId);
+}
+
 // ── Presence tracking (in-memory) ────────────────────────────────────────────
 // Maps projectId → Set of socket IDs that are present
 const presenceMap = new Map<number, Map<string, { userId: number; email: string }>>();
@@ -183,6 +219,7 @@ function initSocket(httpServer: http.Server): Server {
     // ── Cursor relay ──────────────────────────────────────────────────────────
     socket.on('cursor:move', (data: { x: number; y: number; projectId: number }) => {
       if (!userId) return;
+      if (isThrottled(socket.id, 'cursor:move')) return;
       if (!Number.isInteger(data.projectId) || data.projectId <= 0) return;
       if (typeof data.x !== 'number' || typeof data.y !== 'number') return;
       if (!Number.isFinite(data.x) || !Number.isFinite(data.y)) return;
@@ -200,6 +237,7 @@ function initSocket(httpServer: http.Server): Server {
 
     socket.on('cursor:leave', (data: { projectId: number }) => {
       if (!userId) return;
+      if (isThrottled(socket.id, 'cursor:leave')) return;
       if (!Number.isInteger(data.projectId) || data.projectId <= 0) return;
       if (!isInProjectRoom(socket, data.projectId)) return;
       if (!canAccessProject(userId, data.projectId)) return;
@@ -209,6 +247,7 @@ function initSocket(httpServer: http.Server): Server {
     // ── Ticket viewing ──────────────────────────────────────────────────────
     socket.on('ticket:view', (data: { ticketId: number; projectId: number }) => {
       if (!userId) return;
+      if (isThrottled(socket.id, 'ticket:view')) return;
       if (!Number.isInteger(data.projectId) || data.projectId <= 0) return;
       if (!Number.isInteger(data.ticketId) || data.ticketId <= 0) return;
       if (!isInProjectRoom(socket, data.projectId)) return;
@@ -228,6 +267,7 @@ function initSocket(httpServer: http.Server): Server {
 
     socket.on('ticket:unview', (data: { ticketId: number; projectId: number }) => {
       if (!userId) return;
+      if (isThrottled(socket.id, 'ticket:unview')) return;
       if (!Number.isInteger(data.projectId) || data.projectId <= 0) return;
       if (!Number.isInteger(data.ticketId) || data.ticketId <= 0) return;
       if (!isInProjectRoom(socket, data.projectId)) return;
@@ -251,6 +291,7 @@ function initSocket(httpServer: http.Server): Server {
     // ── Typing indicator ────────────────────────────────────────────────────
     socket.on('ticket:typing', (data: { ticketId: number; projectId: number }) => {
       if (!userId) return;
+      if (isThrottled(socket.id, 'ticket:typing')) return;
       if (!Number.isInteger(data.projectId) || data.projectId <= 0) return;
       if (!Number.isInteger(data.ticketId) || data.ticketId <= 0) return;
       if (!isInProjectRoom(socket, data.projectId)) return;
@@ -265,6 +306,7 @@ function initSocket(httpServer: http.Server): Server {
 
     socket.on('ticket:stop-typing', (data: { ticketId: number; projectId: number }) => {
       if (!userId) return;
+      if (isThrottled(socket.id, 'ticket:stop-typing')) return;
       if (!Number.isInteger(data.projectId) || data.projectId <= 0) return;
       if (!Number.isInteger(data.ticketId) || data.ticketId <= 0) return;
       if (!isInProjectRoom(socket, data.projectId)) return;
@@ -283,6 +325,7 @@ function initSocket(httpServer: http.Server): Server {
     ]);
     socket.on('ticket:editing', (data: { ticketId: number; projectId: number; field: string }) => {
       if (!userId || typeof data.field !== 'string' || !VALID_EDITING_FIELDS.has(data.field)) return;
+      if (isThrottled(socket.id, 'ticket:editing')) return;
       if (!Number.isInteger(data.projectId) || data.projectId <= 0) return;
       if (!Number.isInteger(data.ticketId) || data.ticketId <= 0) return;
       if (!isInProjectRoom(socket, data.projectId)) return;
@@ -300,6 +343,7 @@ function initSocket(httpServer: http.Server): Server {
 
     socket.on('ticket:stop-editing', (data: { ticketId: number; projectId: number; field: string }) => {
       if (!userId || typeof data.field !== 'string' || !VALID_EDITING_FIELDS.has(data.field)) return;
+      if (isThrottled(socket.id, 'ticket:stop-editing')) return;
       if (!Number.isInteger(data.projectId) || data.projectId <= 0) return;
       if (!Number.isInteger(data.ticketId) || data.ticketId <= 0) return;
       if (!isInProjectRoom(socket, data.projectId)) return;
@@ -321,6 +365,7 @@ function initSocket(httpServer: http.Server): Server {
     const VALID_STATUSES = new Set(['available', 'busy', 'away']);
     socket.on('user:status', (data: { status: 'available' | 'busy' | 'away' }) => {
       if (!userId) return;
+      if (isThrottled(socket.id, 'user:status')) return;
       if (typeof data.status !== 'string' || !VALID_STATUSES.has(data.status)) return;
       userStatusMap.set(userId, { status: data.status, lastActive: Date.now() });
       // Broadcast to all project rooms this user is in
@@ -339,6 +384,7 @@ function initSocket(httpServer: http.Server): Server {
     // ── Drag awareness ──────────────────────────────────────────────────────
     socket.on('ticket:drag-start', (data: { ticketId: number; projectId: number }) => {
       if (!userId) return;
+      if (isThrottled(socket.id, 'ticket:drag-start')) return;
       if (!Number.isInteger(data.projectId) || data.projectId <= 0) return;
       if (!Number.isInteger(data.ticketId) || data.ticketId <= 0) return;
       if (!isInProjectRoom(socket, data.projectId)) return;
@@ -354,6 +400,7 @@ function initSocket(httpServer: http.Server): Server {
 
     socket.on('ticket:drag-end', (data: { ticketId: number; projectId: number }) => {
       if (!userId) return;
+      if (isThrottled(socket.id, 'ticket:drag-end')) return;
       if (!Number.isInteger(data.projectId) || data.projectId <= 0) return;
       if (!Number.isInteger(data.ticketId) || data.ticketId <= 0) return;
       if (!isInProjectRoom(socket, data.projectId)) return;
@@ -368,6 +415,7 @@ function initSocket(httpServer: http.Server): Server {
 
     socket.on('disconnect', () => {
       logger.info(`[Socket] Client disconnected: ${socket.id}`);
+      cleanupThrottle(socket.id);
       if (!userId) return;
       // Remove from all presence rooms and notify
       for (const [projectId] of presenceMap) {

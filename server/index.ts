@@ -133,7 +133,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), stripeWebhookHandler);
 
 app.use(express.json({
-  limit: '1mb',
+  limit: '256kb',
   verify: (req, _res, buf) => {
     (req as Request & { rawBody?: Buffer }).rawBody = Buffer.from(buf);
   },
