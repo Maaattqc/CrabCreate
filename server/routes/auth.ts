@@ -4,34 +4,80 @@ import crypto from 'crypto';
 import rateLimit from 'express-rate-limit';
 import config from '../config';
 import * as repo from '../db/repositories';
+import { createRateLimitStore } from '../middleware/rate-limit-store';
 import { validate } from '../middleware/validate';
 import { requestCodeSchema, verifyCodeSchema, preferencesSchema } from '../schemas';
 import { sendAuthCode } from '../services/email';
 import { requireAuth, type JwtPayload } from '../middleware/auth';
+import logger from '../services/logger';
 import type { UserPreferences } from '../types';
 
 const router = Router();
+const MAX_AUTH_CODE_ATTEMPTS = 5;
+const DEV_LOGIN_ROUTE_ENVS = new Set(['development', 'test']);
 
-// Rate limiters — window static (requires restart), limit dynamic
+function normalizeIp(ip: string): string {
+  return ip.startsWith('::ffff:') ? ip.slice(7) : ip;
+}
+
+function isLoopbackIp(ip: string): boolean {
+  const normalized = normalizeIp(ip.trim().toLowerCase());
+  return normalized === '127.0.0.1' || normalized === '::1';
+}
+
+function isDevLoginEnabled(): boolean {
+  const configured = repo.getConfig('dev_login_enabled');
+  if (configured === undefined) {
+    return config.nodeEnv === 'development' || config.nodeEnv === 'test';
+  }
+  return configured === '1';
+}
+
+function ensureDevLoginAccess(req: Request, res: Response): boolean {
+  if (!isDevLoginEnabled()) {
+    res.status(403).json({ error: 'Dev login disabled by administrator.' });
+    return false;
+  }
+
+  const sourceIp = req.ip || req.socket.remoteAddress || '';
+  if (!isLoopbackIp(sourceIp)) {
+    logger.warn(`[Security] Blocked non-local dev-login attempt from ${sourceIp || 'unknown'}`);
+    res.status(403).json({ error: 'Dev login allowed from localhost only.' });
+    return false;
+  }
+
+  return true;
+}
+
+function clientRateKey(req: Request): string {
+  const ip = req.ip || req.socket.remoteAddress || 'unknown';
+  const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : 'unknown';
+  return `${ip}:${email}`;
+}
+
+// Rate limiters â€” window static (requires restart), limit dynamic
 const requestCodeLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: () => parseInt(repo.getConfig('auth_code_limit') || '5', 10),
+  store: createRateLimitStore('auth_request_code'),
   standardHeaders: 'draft-7',
   legacyHeaders: false,
-  keyGenerator: (req: Request) => req.body?.email || 'unknown',
-  message: { error: 'Trop de demandes de code. Réessayez plus tard.' },
+  keyGenerator: clientRateKey,
+  message: { error: 'Trop de demandes de code. RÃ©essayez plus tard.' },
 });
 
 const verifyCodeLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: () => parseInt(repo.getConfig('auth_verify_limit') || '10', 10),
+  store: createRateLimitStore('auth_verify_code'),
   standardHeaders: 'draft-7',
   legacyHeaders: false,
-  message: { error: 'Trop de tentatives. Réessayez plus tard.' },
+  keyGenerator: clientRateKey,
+  message: { error: 'Trop de tentatives. RÃ©essayez plus tard.' },
 });
 
 function generateCode(): string {
-  return crypto.randomInt(10000000, 100000000).toString();
+  return crypto.randomInt(100000, 1000000).toString();
 }
 
 function getSessionDurationDays(): number {
@@ -88,12 +134,14 @@ function userResponse(user: { id: number; email: string; is_admin: number; plan?
 router.post('/request-code', requestCodeLimiter, validate(requestCodeSchema), async (req: Request, res: Response) => {
   // Check if registration is enabled (existing users can still log in)
   const { email } = req.body;
+  const codeLimit = parseInt(repo.getConfig('auth_code_limit') || '5', 10);
+  const codeWindowMinutes = parseInt(repo.getConfig('auth_code_window_minutes') || '15', 10);
   // Always perform the same operations to prevent user enumeration via timing
   const existingUser = repo.findUserByEmail(email);
-  const recent = repo.countRecentAuthCodes(email, 15);
+  const recent = repo.countRecentAuthCodes(email, codeWindowMinutes);
   const registrationDisabled = !existingUser && repo.getConfig('registration_enabled') === '0';
 
-  if (!registrationDisabled && recent < 5) {
+  if (!registrationDisabled && recent < codeLimit) {
     repo.invalidateAuthCodes(email);
 
     const code = generateCode();
@@ -102,10 +150,10 @@ router.post('/request-code', requestCodeLimiter, validate(requestCodeSchema), as
     repo.createAuthCode(email, code, expiresAt);
 
     const lang = detectLang(req, email);
-    sendAuthCode(email, code, lang).catch(() => {});
+    sendAuthCode(email, code, lang).catch(err => { logger.warn('[Auth] Failed to send auth code email:', err); });
   }
 
-  res.json({ message: 'Si cette adresse est valide, un code a été envoyé.' });
+  res.json({ message: 'Si cette adresse est valide, un code a Ã©tÃ© envoyÃ©.' });
 });
 
 // POST /api/auth/verify-code
@@ -115,13 +163,14 @@ router.post('/verify-code', verifyCodeLimiter, validate(verifyCodeSchema), (req:
   const latestCode = repo.findLatestAuthCode(email);
 
   if (!latestCode) {
-    res.status(400).json({ error: 'Code invalide ou expiré.' });
+    res.status(400).json({ error: 'Code invalide ou expirÃ©.' });
     return;
   }
 
+  const nextAttempts = latestCode.attempts + 1;
   repo.incrementAuthCodeAttempts(latestCode.id);
 
-  if (latestCode.attempts >= 5) {
+  if (nextAttempts > MAX_AUTH_CODE_ATTEMPTS) {
     repo.markAuthCodeUsed(latestCode.id);
     res.status(400).json({ error: 'Trop de tentatives. Demandez un nouveau code.' });
     return;
@@ -129,7 +178,12 @@ router.post('/verify-code', verifyCodeLimiter, validate(verifyCodeSchema), (req:
 
   const codeMatch = repo.isAuthCodeMatch(latestCode.code, code);
   if (!codeMatch) {
-    res.status(400).json({ error: 'Code invalide ou expiré.' });
+    if (nextAttempts >= MAX_AUTH_CODE_ATTEMPTS) {
+      repo.markAuthCodeUsed(latestCode.id);
+      res.status(400).json({ error: 'Trop de tentatives. Demandez un nouveau code.' });
+      return;
+    }
+    res.status(400).json({ error: 'Code invalide ou expirÃ©.' });
     return;
   }
 
@@ -137,10 +191,10 @@ router.post('/verify-code', verifyCodeLimiter, validate(verifyCodeSchema), (req:
 
   let user = repo.findUserByEmail(email);
   if (!user) {
-    // First user ever is admin
+    // First user ever is admin only if email matches ADMIN_EMAIL
     const isFirstUser = repo.countUsers() === 0;
     user = repo.createUser(email);
-    if (isFirstUser) {
+    if (isFirstUser && config.adminEmail && email.toLowerCase() === config.adminEmail.toLowerCase()) {
       repo.setUserAdmin(user.id, true);
       user = repo.findUserById(user.id)!;
     }
@@ -156,93 +210,75 @@ router.post('/verify-code', verifyCodeLimiter, validate(verifyCodeSchema), (req:
   res.json({ user: userResponse(user) });
 });
 
-// POST /api/auth/dev-login — development only, auto-login with ADMIN_EMAIL
-router.post('/dev-login', (req: Request, res: Response) => {
-  if (config.nodeEnv === 'production') {
-    res.status(404).json({ error: 'Not found' });
-    return;
-  }
-  if (repo.getConfig('dev_login_enabled') === '0') {
-    res.status(403).json({ error: 'Dev login désactivé par l\'administrateur.' });
-    return;
-  }
+// Dev-login routes â€” only registered for local development/test
+if (DEV_LOGIN_ROUTE_ENVS.has(config.nodeEnv)) {
+  // POST /api/auth/dev-login â€” auto-login with ADMIN_EMAIL
+  router.post('/dev-login', (req: Request, res: Response) => {
+    if (!ensureDevLoginAccess(req, res)) return;
 
-  const adminEmail = config.adminEmail;
-  if (!adminEmail) {
-    res.status(400).json({ error: 'ADMIN_EMAIL not configured' });
-    return;
-  }
+    const adminEmail = config.adminEmail;
+    if (!adminEmail) {
+      res.status(400).json({ error: 'Dev login unavailable' });
+      return;
+    }
 
-  let user = repo.findUserByEmail(adminEmail);
-  if (!user) {
-    user = repo.createUser(adminEmail);
-    repo.setUserAdmin(user.id, true);
+    let user = repo.findUserByEmail(adminEmail);
+    if (!user) {
+      user = repo.createUser(adminEmail);
+      repo.setUserAdmin(user.id, true);
+      user = repo.findUserById(user.id)!;
+    }
+    repo.updateUserLastLogin(user.id);
+    repo.clearTokenInvalidation(user.id);
+
+    const payload: JwtPayload = { userId: user.id, email: user.email };
+    const token = jwt.sign(payload, config.jwtSecret, { algorithm: 'HS512', expiresIn: `${getSessionDurationDays()}d` });
+
+    setAuthCookie(res, token);
+    repo.insertAuditLog(user.id, user.email, 'dev_login', 'user', user.id, 'Dev admin login', req.ip);
+    res.json({ user: userResponse(user) });
+  });
+
+  // POST /api/auth/dev-login-client â€” auto-login as regular user
+  router.post('/dev-login-client', (req: Request, res: Response) => {
+    if (!ensureDevLoginAccess(req, res)) return;
+
+    const clientEmail = 'client-demo@crabcreate.dev';
+    let user = repo.findUserByEmail(clientEmail);
+    if (!user) {
+      user = repo.createUser(clientEmail);
+      user = repo.findUserById(user.id)!;
+    }
+    repo.updateUserLastLogin(user.id);
+    repo.clearTokenInvalidation(user.id);
+
+    const payload: JwtPayload = { userId: user.id, email: user.email };
+    const token = jwt.sign(payload, config.jwtSecret, { algorithm: 'HS512', expiresIn: `${getSessionDurationDays()}d` });
+
+    setAuthCookie(res, token);
+    repo.insertAuditLog(user.id, user.email, 'dev_login', 'user', user.id, 'Dev client login', req.ip);
+    res.json({ user: userResponse(user) });
+  });
+
+  // POST /api/auth/dev-login-new â€” create a fresh client each time
+  router.post('/dev-login-new', (req: Request, res: Response) => {
+    if (!ensureDevLoginAccess(req, res)) return;
+
+    const timestamp = Date.now();
+    const newEmail = `new-client-${timestamp}@crabcreate.dev`;
+    let user = repo.createUser(newEmail);
     user = repo.findUserById(user.id)!;
-  }
-  repo.updateUserLastLogin(user.id);
-  repo.clearTokenInvalidation(user.id);
+    repo.updateUserLastLogin(user.id);
+    repo.clearTokenInvalidation(user.id);
 
-  const payload: JwtPayload = { userId: user.id, email: user.email };
-  const token = jwt.sign(payload, config.jwtSecret, { algorithm: 'HS512', expiresIn: `${getSessionDurationDays()}d` });
+    const payload: JwtPayload = { userId: user.id, email: user.email };
+    const token = jwt.sign(payload, config.jwtSecret, { algorithm: 'HS512', expiresIn: `${getSessionDurationDays()}d` });
 
-  setAuthCookie(res, token);
-  repo.insertAuditLog(user.id, user.email, 'dev_login', 'user', user.id, 'Dev admin login', req.ip);
-  res.json({ user: userResponse(user) });
-});
-
-// POST /api/auth/dev-login-client — development only, auto-login as regular user
-router.post('/dev-login-client', (req: Request, res: Response) => {
-  if (config.nodeEnv === 'production') {
-    res.status(404).json({ error: 'Not found' });
-    return;
-  }
-  if (repo.getConfig('dev_login_enabled') === '0') {
-    res.status(403).json({ error: 'Dev login désactivé par l\'administrateur.' });
-    return;
-  }
-
-  const clientEmail = 'client-demo@crabcreate.dev';
-  let user = repo.findUserByEmail(clientEmail);
-  if (!user) {
-    user = repo.createUser(clientEmail);
-    user = repo.findUserById(user.id)!;
-  }
-  repo.updateUserLastLogin(user.id);
-  repo.clearTokenInvalidation(user.id);
-
-  const payload: JwtPayload = { userId: user.id, email: user.email };
-  const token = jwt.sign(payload, config.jwtSecret, { algorithm: 'HS512', expiresIn: `${getSessionDurationDays()}d` });
-
-  setAuthCookie(res, token);
-  repo.insertAuditLog(user.id, user.email, 'dev_login', 'user', user.id, 'Dev client login', req.ip);
-  res.json({ user: userResponse(user) });
-});
-
-// POST /api/auth/dev-login-new — development only, create a fresh client each time
-router.post('/dev-login-new', (req: Request, res: Response) => {
-  if (config.nodeEnv === 'production') {
-    res.status(404).json({ error: 'Not found' });
-    return;
-  }
-  if (repo.getConfig('dev_login_enabled') === '0') {
-    res.status(403).json({ error: 'Dev login désactivé par l\'administrateur.' });
-    return;
-  }
-
-  const timestamp = Date.now();
-  const newEmail = `new-client-${timestamp}@crabcreate.dev`;
-  let user = repo.createUser(newEmail);
-  user = repo.findUserById(user.id)!;
-  repo.updateUserLastLogin(user.id);
-  repo.clearTokenInvalidation(user.id);
-
-  const payload: JwtPayload = { userId: user.id, email: user.email };
-  const token = jwt.sign(payload, config.jwtSecret, { algorithm: 'HS512', expiresIn: `${getSessionDurationDays()}d` });
-
-  setAuthCookie(res, token);
-  repo.insertAuditLog(user.id, user.email, 'dev_login', 'user', user.id, 'Dev new client login', req.ip);
-  res.json({ user: userResponse(user) });
-});
+    setAuthCookie(res, token);
+    repo.insertAuditLog(user.id, user.email, 'dev_login', 'user', user.id, 'Dev new client login', req.ip);
+    res.json({ user: userResponse(user) });
+  });
+}
 
 // POST /api/auth/logout
 router.post('/logout', (req: Request, res: Response) => {
@@ -261,28 +297,17 @@ router.post('/logout', (req: Request, res: Response) => {
     secure: config.nodeEnv === 'production',
     sameSite: 'strict',
   });
-  res.json({ message: 'Déconnecté' });
+  res.json({ message: 'DÃ©connectÃ©' });
 });
 
 // GET /api/auth/me
-router.get('/me', (req: Request, res: Response) => {
-  const token = req.cookies?.crab_token;
-  if (!token) {
-    res.status(401).json({ error: 'Not authenticated' });
+router.get('/me', requireAuth, (req: Request, res: Response) => {
+  const user = repo.findUserById(req.user!.userId);
+  if (!user) {
+    res.status(401).json({ error: 'User not found' });
     return;
   }
-
-  try {
-    const payload = jwt.verify(token, config.jwtSecret, { algorithms: ['HS512'] }) as JwtPayload;
-    const user = repo.findUserById(payload.userId);
-    if (!user) {
-      res.status(401).json({ error: 'User not found' });
-      return;
-    }
-    res.json({ user: userResponse(user) });
-  } catch {
-    res.status(401).json({ error: 'Invalid or expired token' });
-  }
+  res.json({ user: userResponse(user) });
 });
 
 // PUT /api/auth/preferences (protected)
@@ -307,3 +332,4 @@ router.put('/preferences', requireAuth, validate(preferencesSchema), (req: Reque
 });
 
 export default router;
+

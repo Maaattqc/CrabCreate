@@ -3,14 +3,25 @@ import crypto from 'crypto';
 import rateLimit from 'express-rate-limit';
 import { emitTicketLog, emitNotification } from '../socket';
 import * as repo from '../db/repositories';
+import { createRateLimitStore } from '../middleware/rate-limit-store';
 import logger from '../services/logger';
 
 const router = Router();
+const WEBHOOK_REPLAY_TTL_SECONDS = 10 * 60;
+
+function buildReplayNonce(signature: string, event: string | undefined, rawBody: Buffer, requestId: string): string {
+  const bodyHash = crypto.createHash('sha256').update(rawBody).digest('hex');
+  return crypto
+    .createHash('sha256')
+    .update(`${event || 'unknown'}|${signature}|${requestId}|${bodyHash}`)
+    .digest('hex');
+}
 
 // Rate limit webhook endpoints
 const webhookLimiter = rateLimit({
   windowMs: 60 * 1000,
   limit: 30,
+  store: createRateLimitStore('webhooks_ingress'),
   standardHeaders: 'draft-7',
   legacyHeaders: false,
   message: { error: 'Too many webhook requests.' },
@@ -52,6 +63,18 @@ router.post('/bitbucket', webhookLimiter, (req: Request, res: Response) => {
   }
 
   const event = req.headers['x-event-key'] as string | undefined;
+  const requestIdHeader =
+    (typeof req.headers['x-request-uuid'] === 'string' && req.headers['x-request-uuid']) ||
+    (typeof req.headers['x-hook-uuid'] === 'string' && req.headers['x-hook-uuid']) ||
+    '';
+  const replayNonce = buildReplayNonce(signature, event, rawBody, requestIdHeader);
+  const isFreshRequest = repo.consumeWebhookNonce('bitbucket', replayNonce, WEBHOOK_REPLAY_TTL_SECONDS);
+  if (!isFreshRequest) {
+    logger.warn(`[Webhook] Replay detected and ignored (event=${event || 'unknown'})`);
+    res.status(200).json({ received: true, duplicate: true });
+    return;
+  }
+
   const payload = req.body;
 
   logger.info(`[Webhook] Bitbucket event: ${event}`);

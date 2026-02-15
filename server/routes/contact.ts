@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
 import * as repo from '../db/repositories';
+import { createRateLimitStore } from '../middleware/rate-limit-store';
 import { validate } from '../middleware/validate';
 
 const router = Router();
@@ -17,6 +18,7 @@ const contactSchema = z.object({
 const contactLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   limit: () => parseInt(repo.getConfig('contact_limit') || '3', 10),
+  store: createRateLimitStore('contact_submit'),
   standardHeaders: 'draft-7',
   legacyHeaders: false,
   message: { error: 'Trop de messages. Réessayez plus tard.' },

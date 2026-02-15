@@ -1,13 +1,25 @@
 import { Router, Request, Response } from 'express';
+import rateLimit from 'express-rate-limit';
 import * as aiCoder from '../services/ai-coder';
 import { emitTicketLog, emitTicketUpdated } from '../socket';
 import * as repo from '../db/repositories';
+import { createRateLimitStore } from '../middleware/rate-limit-store';
 import { validate } from '../middleware/validate';
 import { sendChatSchema } from '../schemas';
 import { hasMinRole } from '../permissions';
 import logger from '../services/logger';
 
 const router = Router();
+
+const chatLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: () => parseInt(repo.getConfig('chat_messages_per_minute') || '20', 10),
+  store: createRateLimitStore('chat_send'),
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  keyGenerator: (req: Request) => `${req.user?.userId ?? 'anonymous'}:${req.project?.id ?? 0}`,
+  message: { error: 'Trop de messages IA. Réessayez plus tard.' },
+});
 
 // GET /api/chat/:id -- Get chat messages for a ticket (any project member)
 router.get('/:id', (req: Request, res: Response) => {
@@ -18,7 +30,7 @@ router.get('/:id', (req: Request, res: Response) => {
 });
 
 // POST /api/chat/:id -- Send a message to the AI (member+ only)
-router.post('/:id', validate(sendChatSchema), async (req: Request, res: Response) => {
+router.post('/:id', chatLimiter, validate(sendChatSchema), async (req: Request, res: Response) => {
   const ticketId = Number(req.params.id);
   const ticket = repo.findTicketById(ticketId);
   if (!ticket) return res.status(404).json({ error: 'Ticket not found' });

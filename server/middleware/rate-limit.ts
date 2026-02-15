@@ -1,5 +1,6 @@
 import rateLimit from 'express-rate-limit';
 import * as repo from '../db/repositories';
+import { createRateLimitStore } from './rate-limit-store';
 
 // Default settings
 const DEFAULTS = {
@@ -17,6 +18,7 @@ function getSetting(key: string, fallback: number): number {
 export const apiLimiter = rateLimit({
   windowMs: 60 * 1000,
   limit: () => getSetting('max_requests_per_minute', DEFAULTS.max_requests_per_minute),
+  store: createRateLimitStore('api_global'),
   standardHeaders: 'draft-7',
   legacyHeaders: false,
   message: { error: 'Too many requests, please try again later' },
@@ -26,6 +28,7 @@ export const apiLimiter = rateLimit({
 export const createTicketLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   limit: () => getSetting('max_tickets_per_hour', DEFAULTS.max_tickets_per_hour),
+  store: createRateLimitStore('tickets_create'),
   standardHeaders: 'draft-7',
   legacyHeaders: false,
   message: { error: 'Too many tickets created, please wait' },

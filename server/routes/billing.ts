@@ -1,13 +1,24 @@
 import { Router, Request, Response } from 'express';
+import rateLimit from 'express-rate-limit';
 import config from '../config';
 import * as repo from '../db/repositories';
+import { createRateLimitStore } from '../middleware/rate-limit-store';
 import { createCheckoutSession, createPortalSession } from '../services/stripe';
 import logger from '../services/logger';
 
 const router = Router();
 
+const billingLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  store: createRateLimitStore('billing_actions'),
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'Too many billing requests. Try again later.' },
+});
+
 // POST /api/billing/checkout — create Stripe Checkout session for Pro plan
-router.post('/checkout', async (req: Request, res: Response) => {
+router.post('/checkout', billingLimiter, async (req: Request, res: Response) => {
   const userId = req.user!.userId;
   const user = repo.findUserById(userId);
   if (!user) {
@@ -36,7 +47,7 @@ router.post('/checkout', async (req: Request, res: Response) => {
 });
 
 // POST /api/billing/portal — create Stripe Customer Portal session
-router.post('/portal', async (req: Request, res: Response) => {
+router.post('/portal', billingLimiter, async (req: Request, res: Response) => {
   const userId = req.user!.userId;
 
   try {

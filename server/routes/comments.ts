@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import rateLimit from 'express-rate-limit';
 import * as repo from '../db/repositories';
+import { createRateLimitStore } from '../middleware/rate-limit-store';
 import { validate } from '../middleware/validate';
 import { createCommentSchema, updateCommentSchema, toggleReactionSchema } from '../schemas';
 import { hasMinRole } from '../permissions';
@@ -11,6 +12,7 @@ const router = Router();
 const commentWriteLimiter = rateLimit({
   windowMs: 60 * 1000,
   limit: 20,
+  store: createRateLimitStore('comments_write'),
   standardHeaders: 'draft-7',
   legacyHeaders: false,
   message: { error: 'Too many requests. Slow down.' },
@@ -19,6 +21,7 @@ const commentWriteLimiter = rateLimit({
 const reactionLimiter = rateLimit({
   windowMs: 60 * 1000,
   limit: 30,
+  store: createRateLimitStore('comments_react'),
   standardHeaders: 'draft-7',
   legacyHeaders: false,
   message: { error: 'Too many reactions. Slow down.' },

@@ -261,6 +261,22 @@ function migrate(): void {
       enabled INTEGER DEFAULT 1,
       created_at TEXT DEFAULT (datetime('now'))
     );
+
+    CREATE TABLE IF NOT EXISTS kanban_webhook_replay (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      source TEXT NOT NULL,
+      nonce TEXT NOT NULL,
+      expires_at TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')),
+      UNIQUE(source, nonce)
+    );
+
+    CREATE TABLE IF NOT EXISTS kanban_rate_limit_hits (
+      bucket_key TEXT PRIMARY KEY,
+      hits INTEGER NOT NULL DEFAULT 0,
+      reset_at INTEGER NOT NULL,
+      updated_at TEXT DEFAULT (datetime('now'))
+    );
   `);
 
   // ── Indexes ──
@@ -293,6 +309,12 @@ function migrate(): void {
   } catch { /* index may already exist */ }
   try {
     db.exec("CREATE INDEX IF NOT EXISTS idx_user_webhooks_project ON kanban_user_webhooks(project_id)");
+  } catch { /* index may already exist */ }
+  try {
+    db.exec("CREATE INDEX IF NOT EXISTS idx_webhook_replay_expires ON kanban_webhook_replay(expires_at)");
+  } catch { /* index may already exist */ }
+  try {
+    db.exec("CREATE INDEX IF NOT EXISTS idx_rate_limit_reset_at ON kanban_rate_limit_hits(reset_at)");
   } catch { /* index may already exist */ }
 
   // ── Column migrations for existing DBs ──
@@ -421,6 +443,19 @@ function migrate(): void {
       if (!row.cf_api_token) continue;
       if (isEncryptedSecret(row.cf_api_token)) continue;
       upd.run(encryptSecret(row.cf_api_token), row.id);
+    }
+  } catch {
+    // best effort only
+  }
+
+  // Encrypt existing user webhook secrets at rest (idempotent)
+  try {
+    const webhookRows = db.prepare('SELECT id, secret FROM kanban_user_webhooks').all() as { id: number; secret: string | null }[];
+    const upd = db.prepare('UPDATE kanban_user_webhooks SET secret = ? WHERE id = ?');
+    for (const row of webhookRows) {
+      if (!row.secret) continue;
+      if (isEncryptedSecret(row.secret)) continue;
+      upd.run(encryptSecret(row.secret), row.id);
     }
   } catch {
     // best effort only

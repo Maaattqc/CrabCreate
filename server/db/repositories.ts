@@ -5,6 +5,7 @@ import {
   encryptSecret,
   hashAuthCode,
 } from '../services/secrets';
+import { isAllowedProjectRepoId } from '../security/project-repo';
 
 /** Escape LIKE wildcard characters in user input */
 function escapeLike(str: string): string {
@@ -442,13 +443,6 @@ export function createAuthCode(email: string, code: string, expiresAt: string): 
   return db.prepare('SELECT * FROM auth_codes WHERE id = ?').get(result.lastInsertRowid) as AuthCode;
 }
 
-export function findValidAuthCode(email: string, code: string): AuthCode | undefined {
-  const hashed = hashAuthCode(code);
-  return db.prepare(
-    "SELECT * FROM auth_codes WHERE email = ? AND code IN (?, ?) AND used = 0 AND attempts < 5 AND expires_at > datetime('now') ORDER BY created_at DESC LIMIT 1"
-  ).get(email, code, hashed) as AuthCode | undefined;
-}
-
 export function isAuthCodeMatch(storedCode: string, providedCode: string): boolean {
   return authCodeMatches(storedCode, providedCode);
 }
@@ -476,6 +470,38 @@ export function findLatestAuthCode(email: string): AuthCode | undefined {
   return db.prepare(
     "SELECT * FROM auth_codes WHERE email = ? AND used = 0 AND expires_at > datetime('now') ORDER BY created_at DESC LIMIT 1"
   ).get(email) as AuthCode | undefined;
+}
+
+export function consumeWebhookNonce(source: string, nonce: string, ttlSeconds: number): boolean {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS kanban_webhook_replay (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      source TEXT NOT NULL,
+      nonce TEXT NOT NULL,
+      expires_at TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')),
+      UNIQUE(source, nonce)
+    );
+    CREATE INDEX IF NOT EXISTS idx_webhook_replay_expires ON kanban_webhook_replay(expires_at);
+  `);
+
+  const safeTtl = Number.isFinite(ttlSeconds)
+    ? Math.max(30, Math.min(24 * 60 * 60, Math.floor(ttlSeconds)))
+    : 10 * 60;
+
+  db.prepare("DELETE FROM kanban_webhook_replay WHERE expires_at <= datetime('now')").run();
+
+  try {
+    db.prepare(
+      "INSERT INTO kanban_webhook_replay (source, nonce, expires_at) VALUES (?, ?, datetime('now', ?))"
+    ).run(source, nonce, `+${safeTtl} seconds`);
+    return true;
+  } catch (err) {
+    if (err instanceof Error && err.message.includes('UNIQUE constraint failed')) {
+      return false;
+    }
+    throw err;
+  }
 }
 
 export function updateUserPreferences(id: number, preferences: string): void {
@@ -518,13 +544,16 @@ export function updateUserStripeSubscription(id: number, subscriptionId: string 
 }
 
 export function findUserByStripeCustomerId(stripeCustomerId: string): AuthUser | undefined {
-  // Search both encrypted and plaintext (backward compat during migration)
-  const encrypted = encryptSecret(stripeCustomerId);
-  const users = db.prepare('SELECT * FROM auth_users WHERE stripe_customer_id IS NOT NULL').all() as AuthUser[];
-  return users.find(u => {
-    const decrypted = decryptSecret(u.stripe_customer_id);
-    return decrypted === stripeCustomerId || u.stripe_customer_id === stripeCustomerId;
-  });
+  // AES-GCM uses random IV so encryption is non-deterministic — must decrypt each row.
+  // Only fetch id + stripe_customer_id for the scan, then load full user on match.
+  const rows = db.prepare('SELECT id, stripe_customer_id FROM auth_users WHERE stripe_customer_id IS NOT NULL').all() as { id: number; stripe_customer_id: string }[];
+  for (const row of rows) {
+    const decrypted = decryptSecret(row.stripe_customer_id);
+    if (decrypted === stripeCustomerId || row.stripe_customer_id === stripeCustomerId) {
+      return findUserById(row.id);
+    }
+  }
+  return undefined;
 }
 
 export function countUserTicketsThisMonth(userId: number, projectId: number): number {
@@ -538,6 +567,19 @@ export function countUserActivePipelines(userId: number, projectId: number): num
   const row = db.prepare(
     "SELECT COUNT(*) as count FROM kanban_tickets WHERE user_id = ? AND project_id = ? AND status IN ('estimating', 'ai_coding', 'ai_review', 'testing', 'deploying')"
   ).get(userId, projectId) as CountResult;
+  return row.count;
+}
+
+export function countActivePipelines(projectId?: number): number {
+  if (typeof projectId === 'number' && projectId > 0) {
+    const row = db.prepare(
+      "SELECT COUNT(*) as count FROM kanban_tickets WHERE project_id = ? AND status IN ('estimating', 'ai_coding', 'ai_review', 'testing', 'deploying')"
+    ).get(projectId) as CountResult;
+    return row.count;
+  }
+  const row = db.prepare(
+    "SELECT COUNT(*) as count FROM kanban_tickets WHERE status IN ('estimating', 'ai_coding', 'ai_review', 'testing', 'deploying')"
+  ).get() as CountResult;
   return row.count;
 }
 
@@ -674,6 +716,10 @@ export function updateProject(id: number, fields: Partial<Pick<Project, 'name' |
 
   db.prepare(`UPDATE kanban_projects SET ${updates.join(', ')} WHERE id = ?`).run(...values);
   return db.prepare('SELECT * FROM kanban_projects WHERE id = ?').get(id) as Project | undefined;
+}
+
+export function updateProjectOwner(projectId: number, newOwnerId: number): void {
+  db.prepare("UPDATE kanban_projects SET owner_id = ?, updated_at = datetime('now') WHERE id = ?").run(newOwnerId, projectId);
 }
 
 export function deleteProject(id: number): void {
@@ -1135,6 +1181,16 @@ export function findFavoritesByUserId(userId: number): FavoriteWithTicket[] {
   `).all(userId) as FavoriteWithTicket[];
 }
 
+export function findFavoritesByUserIdInProject(userId: number, projectId: number): FavoriteWithTicket[] {
+  return db.prepare(`
+    SELECT f.*, t.title, t.status, t.priority
+    FROM kanban_favorites f
+    INNER JOIN kanban_tickets t ON f.ticket_id = t.id
+    WHERE f.user_id = ? AND t.project_id = ?
+    ORDER BY f.created_at DESC
+  `).all(userId, projectId) as FavoriteWithTicket[];
+}
+
 export function isFavorite(userId: number, ticketId: number): boolean {
   const row = db.prepare('SELECT user_id FROM kanban_favorites WHERE user_id = ? AND ticket_id = ?').get(userId, ticketId);
   return !!row;
@@ -1148,6 +1204,14 @@ export function toggleFavorite(userId: number, ticketId: number): { favorited: b
   }
   db.prepare('INSERT INTO kanban_favorites (user_id, ticket_id) VALUES (?, ?)').run(userId, ticketId);
   return { favorited: true };
+}
+
+export function deleteFavoritesForUserInProject(userId: number, projectId: number): void {
+  db.prepare(`
+    DELETE FROM kanban_favorites
+    WHERE user_id = ?
+      AND ticket_id IN (SELECT id FROM kanban_tickets WHERE project_id = ?)
+  `).run(userId, projectId);
 }
 
 // ── Ticket Templates ────────────────────────────────────────────────────────
@@ -1198,18 +1262,33 @@ export function deleteTemplate(id: number): void {
 // ── User Webhooks ───────────────────────────────────────────────────────────
 
 export function findUserWebhooksByProjectId(projectId: number): UserWebhook[] {
-  return db.prepare('SELECT * FROM kanban_user_webhooks WHERE project_id = ? ORDER BY created_at DESC').all(projectId) as UserWebhook[];
+  const hooks = db.prepare('SELECT * FROM kanban_user_webhooks WHERE project_id = ? ORDER BY created_at DESC').all(projectId) as UserWebhook[];
+  return hooks.map(h => ({
+    ...h,
+    secret: h.secret ? decryptSecret(h.secret) : null,
+  }));
+}
+
+export function countUserWebhooksByProject(projectId: number): number {
+  const row = db.prepare('SELECT COUNT(*) as count FROM kanban_user_webhooks WHERE project_id = ?').get(projectId) as CountResult;
+  return row.count;
 }
 
 export function findUserWebhookById(id: number): UserWebhook | undefined {
-  return db.prepare('SELECT * FROM kanban_user_webhooks WHERE id = ?').get(id) as UserWebhook | undefined;
+  const hook = db.prepare('SELECT * FROM kanban_user_webhooks WHERE id = ?').get(id) as UserWebhook | undefined;
+  if (!hook) return undefined;
+  return {
+    ...hook,
+    secret: hook.secret ? decryptSecret(hook.secret) : null,
+  };
 }
 
 export function createUserWebhook(projectId: number, data: { url: string; events: string[]; secret?: string }): UserWebhook {
+  const encryptedSecret = data.secret ? encryptSecret(data.secret) : null;
   const result = db.prepare(
     'INSERT INTO kanban_user_webhooks (project_id, url, events, secret) VALUES (?, ?, ?, ?)'
-  ).run(projectId, data.url, JSON.stringify(data.events), data.secret || null);
-  return db.prepare('SELECT * FROM kanban_user_webhooks WHERE id = ?').get(result.lastInsertRowid) as UserWebhook;
+  ).run(projectId, data.url, JSON.stringify(data.events), encryptedSecret);
+  return findUserWebhookById(Number(result.lastInsertRowid))!;
 }
 
 export function updateUserWebhook(id: number, fields: Record<string, any>): UserWebhook | undefined {
@@ -1219,23 +1298,49 @@ export function updateUserWebhook(id: number, fields: Record<string, any>): User
   for (const key of allowed) {
     if (fields[key] !== undefined && /^[a-z_]+$/.test(key)) {
       updates.push(`${key} = ?`);
-      values.push(key === 'events' ? JSON.stringify(fields[key]) : fields[key]);
+      if (key === 'events') {
+        values.push(JSON.stringify(fields[key]));
+      } else if (key === 'secret') {
+        values.push(fields[key] ? encryptSecret(fields[key]) : null);
+      } else {
+        values.push(fields[key]);
+      }
     }
   }
   if (updates.length === 0) return undefined;
   values.push(id);
   db.prepare(`UPDATE kanban_user_webhooks SET ${updates.join(', ')} WHERE id = ?`).run(...values);
-  return db.prepare('SELECT * FROM kanban_user_webhooks WHERE id = ?').get(id) as UserWebhook | undefined;
+  return findUserWebhookById(id);
 }
 
 export function deleteUserWebhook(id: number): void {
   db.prepare('DELETE FROM kanban_user_webhooks WHERE id = ?').run(id);
 }
 
+function parseWebhookEvents(rawEvents: string): string[] {
+  if (!rawEvents) return [];
+  try {
+    const parsed = JSON.parse(rawEvents);
+    if (Array.isArray(parsed)) {
+      return parsed.filter((v): v is string => typeof v === 'string').map(v => v.trim()).filter(Boolean);
+    }
+  } catch {
+    // Legacy fallback: comma-separated values
+  }
+  return rawEvents.split(',').map(v => v.trim()).filter(Boolean);
+}
+
 export function findUserWebhooksByEvent(projectId: number, event: string): UserWebhook[] {
-  return db.prepare(
-    "SELECT * FROM kanban_user_webhooks WHERE project_id = ? AND enabled = 1 AND events LIKE ?"
-  ).all(projectId, `%${event}%`) as UserWebhook[];
+  const hooks = db.prepare(
+    'SELECT * FROM kanban_user_webhooks WHERE project_id = ? AND enabled = 1'
+  ).all(projectId) as UserWebhook[];
+
+  return hooks
+    .filter(h => parseWebhookEvents(h.events).includes(event))
+    .map(h => ({
+      ...h,
+      secret: h.secret ? decryptSecret(h.secret) : null,
+    }));
 }
 
 // ── Global Search ───────────────────────────────────────────────────────────
@@ -1347,7 +1452,12 @@ export function getProjectSetupStatus(projectId: number): ProjectSetupStatus {
     return { repoConfigured: false, deployConfigured: false, gitProvider: null, repoUrl: null, cfSiteUrl: null };
   }
 
-  const repo = findRepoById(project.default_repo);
+  const defaultRepoId = String(project.default_repo || '').trim();
+  if (!defaultRepoId || !isAllowedProjectRepoId(projectId, defaultRepoId)) {
+    return { repoConfigured: false, deployConfigured: false, gitProvider: null, repoUrl: null, cfSiteUrl: null };
+  }
+
+  const repo = findRepoById(defaultRepoId);
   const repoConfigured = !!(repo && (repo.clone_url || (repo.bitbucket_workspace && repo.bitbucket_repo_slug)));
 
   const deploy = findDeployConfigByProject(projectId);

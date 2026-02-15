@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import rateLimit from 'express-rate-limit';
 import * as repo from '../db/repositories';
+import { createRateLimitStore } from '../middleware/rate-limit-store';
 import { requireAdmin } from '../middleware/auth';
 import { validate } from '../middleware/validate';
 import { adminBlockSchema, adminPlanSchema, adminToggleSchema } from '../schemas';
@@ -19,6 +20,7 @@ router.use(requireAdmin);
 const adminWriteLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 50,
+  store: createRateLimitStore('admin_write'),
   standardHeaders: 'draft-7',
   legacyHeaders: false,
   message: { error: 'Too many admin requests. Try again later.' },
@@ -129,12 +131,17 @@ router.get('/stats', (req: Request, res: Response) => {
 });
 
 // GET /api/admin/logs — audit logs with pagination + category filter
+const VALID_LOG_CATEGORIES = new Set(['auth', 'ticket', 'pipeline', 'admin', 'feedback', 'project', 'delete']);
+
 router.get('/logs', (req: Request, res: Response) => {
   const defaultLimit = parseInt(repo.getConfig('audit_log_default_limit') || '50', 10);
   const maxLimit = parseInt(repo.getConfig('audit_log_max_limit') || '200', 10);
-  const limit = Math.min(Number(req.query.limit) || defaultLimit, maxLimit);
-  const offset = Math.min(Math.max(Number(req.query.offset) || 0, 0), 10000);
-  const category = req.query.category as string | undefined;
+  const rawLimit = Number(req.query.limit);
+  const rawOffset = Number(req.query.offset);
+  const limit = Math.min(Number.isFinite(rawLimit) && rawLimit > 0 ? Math.floor(rawLimit) : defaultLimit, maxLimit);
+  const offset = Math.min(Math.max(Number.isFinite(rawOffset) ? Math.floor(rawOffset) : 0, 0), 10000);
+  const rawCategory = typeof req.query.category === 'string' ? req.query.category : undefined;
+  const category = rawCategory && VALID_LOG_CATEGORIES.has(rawCategory) ? rawCategory : undefined;
   // category maps to action prefix: "auth" -> login/dev_login, "ticket" -> ticket_*, "pipeline" -> pipeline_*, "admin" -> user_*, "project" -> project_*, "delete" -> *_delete
   const filterMap: Record<string, string> = {
     auth: 'login',

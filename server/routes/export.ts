@@ -1,7 +1,19 @@
 import { Router, Request, Response } from 'express';
+import rateLimit from 'express-rate-limit';
 import * as repo from '../db/repositories';
+import { createRateLimitStore } from '../middleware/rate-limit-store';
 
 const router = Router();
+
+const exportLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: () => parseInt(repo.getConfig('export_requests_per_hour') || '30', 10),
+  store: createRateLimitStore('export_generate'),
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  keyGenerator: (req: Request) => `${req.user?.userId ?? 'anonymous'}:${req.project?.id ?? 0}`,
+  message: { error: 'Too many export requests. Try again later.' },
+});
 
 /** Escape HTML special characters to prevent XSS */
 function escapeHtml(str: string): string {
@@ -24,7 +36,7 @@ function escapeCsvField(value: string): string {
 }
 
 // GET /api/export/csv
-router.get('/csv', (req: Request, res: Response) => {
+router.get('/csv', exportLimiter, (req: Request, res: Response) => {
   const projectId = req.project!.id;
   const tickets = repo.findAllTickets({}, undefined, projectId);
 
@@ -48,7 +60,7 @@ router.get('/csv', (req: Request, res: Response) => {
 });
 
 // GET /api/export/pdf
-router.get('/pdf', (req: Request, res: Response) => {
+router.get('/pdf', exportLimiter, (req: Request, res: Response) => {
   const projectId = req.project!.id;
   const tickets = repo.findAllTickets({}, undefined, projectId);
 
