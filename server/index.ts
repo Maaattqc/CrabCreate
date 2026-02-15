@@ -50,6 +50,12 @@ if (config.nodeEnv === 'production' && (!config.jwtSecret || config.jwtSecret ==
   process.exit(1);
 }
 
+// Validate encryption key separation in production
+if (config.nodeEnv === 'production' && !process.env.SECRETS_ENCRYPTION_KEY) {
+  logger.error('SECRETS_ENCRYPTION_KEY must be set in production (separate from JWT_SECRET). Exiting.');
+  process.exit(1);
+}
+
 // Validate Stripe configuration: both keys must be set together
 if (config.stripeSecretKey && !config.stripeWebhookSecret) {
   logger.warn('STRIPE_SECRET_KEY is set but STRIPE_WEBHOOK_SECRET is missing. Stripe webhooks will not work.');

@@ -5,6 +5,9 @@ import logger from './logger';
 const ENC_PREFIX = 'enc:v1:';
 const AUTH_CODE_HASH_PREFIX = 'h1:';
 
+let _cachedKey: Buffer | null = null;
+let _cachedSource: string | null = null;
+
 function keyMaterial(): Buffer {
   const source = process.env.SECRETS_ENCRYPTION_KEY || config.jwtSecret;
   if (!source || source === 'dev-secret-change-me-in-production') {
@@ -12,14 +15,23 @@ function keyMaterial(): Buffer {
       throw new Error('SECRETS_ENCRYPTION_KEY or a strong JWT_SECRET is required in production');
     }
   }
-  return crypto.createHash('sha256').update(source || 'dev-secret-change-me-in-production').digest();
+  const effectiveSource = source || 'dev-secret-change-me-in-production';
+  if (_cachedKey && _cachedSource === effectiveSource) return _cachedKey;
+  _cachedKey = crypto.createHash('sha256').update(effectiveSource).digest();
+  _cachedSource = effectiveSource;
+  return _cachedKey;
 }
 
 function timingSafeStringEquals(a: string, b: string): boolean {
   const aBuf = Buffer.from(a);
   const bBuf = Buffer.from(b);
-  if (aBuf.length !== bBuf.length) return false;
-  return crypto.timingSafeEqual(aBuf, bBuf);
+  // Pad to same length to prevent length-based timing leak
+  const maxLen = Math.max(aBuf.length, bBuf.length);
+  const aPadded = Buffer.alloc(maxLen);
+  const bPadded = Buffer.alloc(maxLen);
+  aBuf.copy(aPadded);
+  bBuf.copy(bPadded);
+  return aBuf.length === bBuf.length && crypto.timingSafeEqual(aPadded, bPadded);
 }
 
 export function isEncryptedSecret(value: string | null | undefined): boolean {
@@ -56,6 +68,7 @@ export function decryptSecret(value: string | null | undefined): string {
     const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()]);
     return decrypted.toString('utf8');
   } catch {
+    logger.warn('[Secrets] Decryption failed — encryption key may have changed');
     return '';
   }
 }

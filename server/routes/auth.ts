@@ -27,10 +27,11 @@ function isLoopbackIp(ip: string): boolean {
 
 function isDevLoginEnabled(): boolean {
   const configured = repo.getConfig('dev_login_enabled');
-  if (configured === undefined) {
-    return config.nodeEnv === 'development' || config.nodeEnv === 'test';
+  if (configured !== undefined) {
+    return configured === '1';
   }
-  return configured === '1';
+  // Default: enabled in dev/test (routes already restricted to localhost + dev/test env)
+  return DEV_LOGIN_ROUTE_ENVS.has(config.nodeEnv);
 }
 
 function ensureDevLoginAccess(req: Request, res: Response): boolean {
@@ -39,9 +40,11 @@ function ensureDevLoginAccess(req: Request, res: Response): boolean {
     return false;
   }
 
-  const sourceIp = req.ip || req.socket.remoteAddress || '';
-  if (!isLoopbackIp(sourceIp)) {
-    logger.warn(`[Security] Blocked non-local dev-login attempt from ${sourceIp || 'unknown'}`);
+  // Check both proxy-resolved IP and raw TCP socket to prevent X-Forwarded-For spoofing
+  const proxyIp = req.ip || '';
+  const socketIp = req.socket.remoteAddress || '';
+  if (!isLoopbackIp(proxyIp) || !isLoopbackIp(socketIp)) {
+    logger.warn(`[Security] Blocked non-local dev-login attempt from proxy=${proxyIp} socket=${socketIp}`);
     res.status(403).json({ error: 'Dev login allowed from localhost only.' });
     return false;
   }

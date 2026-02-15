@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
 import * as repo from '../db/repositories';
 import { validate } from '../middleware/validate';
-import { connectRepoSchema, createRepoSchema, configureDeploySchema } from '../schemas';
+import { connectRepoSchema, createRepoSchema } from '../schemas';
 import { createGitProvider, buildCloneUrl } from '../services/git-providers';
 import * as cloudflarePages from '../services/cloudflare-pages';
 import * as supabase from '../services/supabase';
@@ -19,6 +19,17 @@ function requireProjectAdmin(req: Request, res: Response): boolean {
   return true;
 }
 
+/** For credential-sensitive operations (connect-repo, create-repo), require actual project membership.
+ *  Global admins who are not project members cannot store credentials on behalf of a project. */
+function requireProjectMemberAdmin(req: Request, res: Response): boolean {
+  const member = repo.findProjectMember(req.project!.id, req.user!.userId);
+  if (!member || !hasMinRole(member.role, 'admin')) {
+    res.status(403).json({ error: 'Project admin membership required' });
+    return false;
+  }
+  return true;
+}
+
 // GET /api/projects/:id/setup/status
 router.get('/status', (req: Request, res: Response) => {
   const status = repo.getProjectSetupStatus(req.project!.id);
@@ -27,7 +38,7 @@ router.get('/status', (req: Request, res: Response) => {
 
 // POST /api/projects/:id/setup/connect-repo
 router.post('/connect-repo', validate(connectRepoSchema), async (req: Request, res: Response) => {
-  if (!requireProjectAdmin(req, res)) return;
+  if (!requireProjectMemberAdmin(req, res)) return;
 
   const { provider, owner, repo: repoName, token, branch } = req.body;
   const projectId = req.project!.id;
@@ -75,7 +86,7 @@ router.post('/connect-repo', validate(connectRepoSchema), async (req: Request, r
 
 // POST /api/projects/:id/setup/create-repo
 router.post('/create-repo', validate(createRepoSchema), async (req: Request, res: Response) => {
-  if (!requireProjectAdmin(req, res)) return;
+  if (!requireProjectMemberAdmin(req, res)) return;
 
   const { provider, token, repoName, isPrivate } = req.body;
   const projectId = req.project!.id;
@@ -127,7 +138,7 @@ router.post('/create-repo', validate(createRepoSchema), async (req: Request, res
 });
 
 // POST /api/projects/:id/setup/configure-deploy
-router.post('/configure-deploy', validate(configureDeploySchema), async (req: Request, res: Response) => {
+router.post('/configure-deploy', async (req: Request, res: Response) => {
   if (!requireProjectAdmin(req, res)) return;
 
   const cfApiToken = process.env.CF_API_TOKEN;

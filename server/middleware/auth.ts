@@ -67,9 +67,11 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
     }
 
     // Check if token was issued before logout (token revocation)
+    // Append 'Z' because SQLite datetime('now') returns UTC without timezone marker
     const invalidatedAt = repo.getUserTokenInvalidatedAt(payload.userId);
     if (invalidatedAt && payload.iat) {
-      const invalidatedTimestamp = Math.floor(new Date(invalidatedAt).getTime() / 1000);
+      const utcString = invalidatedAt.endsWith('Z') ? invalidatedAt : invalidatedAt + 'Z';
+      const invalidatedTimestamp = Math.floor(new Date(utcString).getTime() / 1000);
       if (payload.iat <= invalidatedTimestamp) {
         res.status(401).json({ error: 'Token revoked' });
         return;

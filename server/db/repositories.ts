@@ -549,7 +549,7 @@ export function findUserByStripeCustomerId(stripeCustomerId: string): AuthUser |
   const rows = db.prepare('SELECT id, stripe_customer_id FROM auth_users WHERE stripe_customer_id IS NOT NULL').all() as { id: number; stripe_customer_id: string }[];
   for (const row of rows) {
     const decrypted = decryptSecret(row.stripe_customer_id);
-    if (decrypted === stripeCustomerId || row.stripe_customer_id === stripeCustomerId) {
+    if (decrypted === stripeCustomerId) {
       return findUserById(row.id);
     }
   }
@@ -912,9 +912,9 @@ export function insertAuditLog(userId: number | null, userEmail: string, action:
 
 export function findAuditLogs(limit = 200, offset = 0, actionFilter?: string): any[] {
   if (actionFilter) {
-    const pattern = actionFilter + '%';
+    const pattern = escapeLike(actionFilter) + '%';
     return db.prepare(
-      'SELECT * FROM kanban_audit_logs WHERE action LIKE ? ORDER BY created_at DESC LIMIT ? OFFSET ?'
+      "SELECT * FROM kanban_audit_logs WHERE action LIKE ? ESCAPE '\\' ORDER BY created_at DESC LIMIT ? OFFSET ?"
     ).all(pattern, limit, offset) as any[];
   }
   return db.prepare(
@@ -924,8 +924,8 @@ export function findAuditLogs(limit = 200, offset = 0, actionFilter?: string): a
 
 export function countAuditLogs(actionFilter?: string): number {
   if (actionFilter) {
-    const pattern = actionFilter + '%';
-    const row = db.prepare('SELECT COUNT(*) as count FROM kanban_audit_logs WHERE action LIKE ?').get(pattern) as { count: number };
+    const pattern = escapeLike(actionFilter) + '%';
+    const row = db.prepare("SELECT COUNT(*) as count FROM kanban_audit_logs WHERE action LIKE ? ESCAPE '\\'").get(pattern) as { count: number };
     return row.count;
   }
   const row = db.prepare('SELECT COUNT(*) as count FROM kanban_audit_logs').get() as { count: number };

@@ -44,7 +44,7 @@ export function csrfGuard(req: Request, res: Response, next: NextFunction): void
   }
 
   // External providers call these endpoints server-to-server.
-  if (req.path.startsWith('/webhooks')) {
+  if (req.path === '/webhooks' || req.path.startsWith('/webhooks/')) {
     next();
     return;
   }

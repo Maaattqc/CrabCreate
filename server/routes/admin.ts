@@ -5,6 +5,7 @@ import { createRateLimitStore } from '../middleware/rate-limit-store';
 import { requireAdmin } from '../middleware/auth';
 import { validate } from '../middleware/validate';
 import { adminBlockSchema, adminPlanSchema, adminToggleSchema } from '../schemas';
+import { disconnectUser } from '../socket';
 
 const router = Router();
 
@@ -57,6 +58,13 @@ router.put('/users/:id/block', adminWriteLimiter, validate(adminBlockSchema), (r
 
   const { blocked, reason } = req.body;
   repo.updateUserBlocked(userId, blocked, reason || undefined);
+
+  // Revoke active sessions when blocking a user
+  if (blocked) {
+    repo.invalidateUserTokens(userId);
+    disconnectUser(userId);
+  }
+
   repo.insertAuditLog(req.user!.userId, req.user!.email, blocked ? 'user_block' : 'user_unblock', 'user', userId, reason);
   res.json({ success: true });
 });
@@ -86,7 +94,24 @@ router.put('/users/:id/admin', adminWriteLimiter, validate(adminToggleSchema), (
   }
 
   const { isAdmin } = req.body;
+
+  // Prevent demoting the last remaining admin
+  if (!isAdmin) {
+    const allUsers = repo.findAllUsers();
+    const adminCount = allUsers.filter(u => u.is_admin === 1).length;
+    if (adminCount <= 1) {
+      return res.status(400).json({ error: 'Cannot demote the last admin' });
+    }
+  }
+
   repo.setUserAdmin(userId, isAdmin);
+
+  // Revoke sessions on demotion so the old admin JWT (with isAdmin:true) is invalidated
+  if (!isAdmin) {
+    repo.invalidateUserTokens(userId);
+    disconnectUser(userId);
+  }
+
   repo.insertAuditLog(req.user!.userId, req.user!.email, isAdmin ? 'user_promote_admin' : 'user_demote_admin', 'user', userId);
   res.json({ success: true });
 });

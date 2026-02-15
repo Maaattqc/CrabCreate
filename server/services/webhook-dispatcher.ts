@@ -94,7 +94,7 @@ export async function dispatchWebhooks(projectId: number, event: string, payload
 
       // Build URL with resolved IP to prevent DNS rebinding
       const fetchUrl = new URL(resolved.parsed.toString());
-      fetchUrl.hostname = resolved.ip;
+      fetchUrl.hostname = net.isIP(resolved.ip) === 6 ? `[${resolved.ip}]` : resolved.ip;
 
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',

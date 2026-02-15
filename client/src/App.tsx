@@ -74,6 +74,27 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+/** Protects admin routes — redirects non-admin users to /dashboard */
+function AdminRoute({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth();
+  const { t } = useLanguage();
+
+  if (loading) {
+    return (
+      <div className="h-screen flex flex-col items-center justify-center" style={{ background: 'var(--bg-gradient)' }}>
+        <div className="text-5xl mb-4 animate-bounce">🦀</div>
+        <p className="text-tx-faint text-sm">{t.authLoading}</p>
+      </div>
+    );
+  }
+
+  if (!user || !user.isAdmin) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return <>{children}</>;
+}
+
 /** Main dashboard */
 function Dashboard() {
   const { user } = useAuth();
@@ -479,7 +500,7 @@ function AppRoutes() {
       <Route path="/privacy" element={<PublicLayout><PrivacyPage /></PublicLayout>} />
       <Route path="/login" element={<Navigate to="/dashboard" replace />} />
       <Route path="/dashboard" element={<DashboardWithAuth />} />
-      <Route path="/admin" element={<ProtectedRoute><AdminPage /></ProtectedRoute>} />
+      <Route path="/admin" element={<AdminRoute><AdminPage /></AdminRoute>} />
       <Route path="*" element={<PublicLayout><NotFoundPage /></PublicLayout>} />
     </Routes>
   );

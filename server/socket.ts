@@ -78,7 +78,7 @@ function isInProjectRoom(socket: { rooms: Set<string> }, projectId: number): boo
 function initSocket(httpServer: http.Server): Server {
   io = new Server(httpServer, {
     cors: {
-      origin: config.nodeEnv === 'development' ? config.clientUrl : false,
+      origin: config.clientUrl,
       methods: ['GET', 'POST'],
       credentials: true,
     },
@@ -104,18 +104,46 @@ function initSocket(httpServer: http.Server): Server {
 
       const invalidatedAt = repo.getUserTokenInvalidatedAt(payload.userId);
       if (invalidatedAt && payload.iat) {
-        const invalidatedTimestamp = Math.floor(new Date(invalidatedAt).getTime() / 1000);
+        const utcString = invalidatedAt.endsWith('Z') ? invalidatedAt : invalidatedAt + 'Z';
+        const invalidatedTimestamp = Math.floor(new Date(utcString).getTime() / 1000);
         if (payload.iat <= invalidatedTimestamp) {
           return next(new Error('Authentication failed'));
         }
       }
 
-      socket.data.user = { userId: payload.userId, email: user.email };
+      socket.data.user = { userId: payload.userId, email: user.email, iat: payload.iat };
       next();
     } catch {
       next(new Error('Authentication failed'));
     }
   });
+
+  // Periodic re-validation: check token/user status every 5 minutes
+  const REVALIDATION_INTERVAL = 5 * 60 * 1000;
+  setInterval(() => {
+    if (!io) return;
+    for (const [, socket] of io.sockets.sockets) {
+      const uid = socket.data.user?.userId;
+      if (!uid) continue;
+      const user = repo.findUserById(uid);
+      if (!user || user.blocked === 1) {
+        socket.disconnect(true);
+        continue;
+      }
+      // Check token revocation
+      const iat = socket.data.user?.iat;
+      if (iat) {
+        const invalidatedAt = repo.getUserTokenInvalidatedAt(uid);
+        if (invalidatedAt) {
+          const utcString = invalidatedAt.endsWith('Z') ? invalidatedAt : invalidatedAt + 'Z';
+          const invalidatedTimestamp = Math.floor(new Date(utcString).getTime() / 1000);
+          if (iat <= invalidatedTimestamp) {
+            socket.disconnect(true);
+          }
+        }
+      }
+    }
+  }, REVALIDATION_INTERVAL);
 
   io.on('connection', (socket) => {
     const userId = socket.data.user?.userId;
@@ -156,6 +184,9 @@ function initSocket(httpServer: http.Server): Server {
     socket.on('cursor:move', (data: { x: number; y: number; projectId: number }) => {
       if (!userId) return;
       if (!Number.isInteger(data.projectId) || data.projectId <= 0) return;
+      if (typeof data.x !== 'number' || typeof data.y !== 'number') return;
+      if (!Number.isFinite(data.x) || !Number.isFinite(data.y)) return;
+      if (data.x < -10000 || data.x > 100000 || data.y < -10000 || data.y > 100000) return;
       if (!isInProjectRoom(socket, data.projectId)) return;
       if (!canAccessProject(userId, data.projectId)) return;
       socket.to(`project:${data.projectId}`).emit('cursor:update', {
@@ -246,8 +277,12 @@ function initSocket(httpServer: http.Server): Server {
     });
 
     // ── Editing lock (per-field) ─────────────────────────────────────────────
+    const VALID_EDITING_FIELDS = new Set([
+      'title', 'description', 'priority', 'status', 'template', 'ai_model',
+      'repo', 'assignee', 'target_files', 'tags', 'depends_on', 'due_date',
+    ]);
     socket.on('ticket:editing', (data: { ticketId: number; projectId: number; field: string }) => {
-      if (!userId || !data.field) return;
+      if (!userId || typeof data.field !== 'string' || !VALID_EDITING_FIELDS.has(data.field)) return;
       if (!Number.isInteger(data.projectId) || data.projectId <= 0) return;
       if (!Number.isInteger(data.ticketId) || data.ticketId <= 0) return;
       if (!isInProjectRoom(socket, data.projectId)) return;
@@ -264,7 +299,7 @@ function initSocket(httpServer: http.Server): Server {
     });
 
     socket.on('ticket:stop-editing', (data: { ticketId: number; projectId: number; field: string }) => {
-      if (!userId || !data.field) return;
+      if (!userId || typeof data.field !== 'string' || !VALID_EDITING_FIELDS.has(data.field)) return;
       if (!Number.isInteger(data.projectId) || data.projectId <= 0) return;
       if (!Number.isInteger(data.ticketId) || data.ticketId <= 0) return;
       if (!isInProjectRoom(socket, data.projectId)) return;
@@ -283,8 +318,10 @@ function initSocket(httpServer: http.Server): Server {
     });
 
     // ── User status ─────────────────────────────────────────────────────────
+    const VALID_STATUSES = new Set(['available', 'busy', 'away']);
     socket.on('user:status', (data: { status: 'available' | 'busy' | 'away' }) => {
       if (!userId) return;
+      if (typeof data.status !== 'string' || !VALID_STATUSES.has(data.status)) return;
       userStatusMap.set(userId, { status: data.status, lastActive: Date.now() });
       // Broadcast to all project rooms this user is in
       if (userId) {
@@ -435,4 +472,14 @@ function emitProjectUpdated(projectId: number, fields: Record<string, any>): voi
   }
 }
 
-export { initSocket, getIO, emitTicketLog, emitTicketStatus, emitTicketUpdated, emitNotification, emitProjectUpdated };
+/** Disconnect all sockets for a given user (used after block/token revocation). */
+function disconnectUser(userId: number): void {
+  if (!io) return;
+  for (const [, socket] of io.sockets.sockets) {
+    if (socket.data.user?.userId === userId) {
+      socket.disconnect(true);
+    }
+  }
+}
+
+export { initSocket, getIO, emitTicketLog, emitTicketStatus, emitTicketUpdated, emitNotification, emitProjectUpdated, disconnectUser };

@@ -202,12 +202,11 @@ router.post('/launch/:id', checkPipelineLimit, pipelineGuard, async (req: Reques
     }
 
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
     logger.error(`[Pipeline] Error for ticket #${req.params.id}:`, err);
     repo.updateTicketStatus(ticket.id, 'backlog', 0);
     emitTicketStatus(ticket.id, 'backlog', 0, projectId);
     emitTicketLog(ticket.id, 'Une erreur est survenue durant le pipeline', 'error', 'error', projectId);
-    repo.insertLog(ticket.id, `Erreur interne: ${message}`, 'error', 'error');
+    repo.insertLog(ticket.id, 'Une erreur interne est survenue durant le pipeline', 'error', 'error');
     fileLocker.unlock(ticket.id);
   }
 });

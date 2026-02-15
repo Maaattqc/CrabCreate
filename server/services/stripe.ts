@@ -1,6 +1,7 @@
 import Stripe from 'stripe';
 import config from '../config';
 import * as repo from '../db/repositories';
+import { decryptSecret } from './secrets';
 import logger from './logger';
 
 const stripe = new Stripe(config.stripeSecretKey);
@@ -14,7 +15,7 @@ export async function createCheckoutSession(
   const user = repo.findUserById(userId);
   if (!user) throw new Error('User not found');
 
-  let customerId = user.stripe_customer_id;
+  let customerId = user.stripe_customer_id ? decryptSecret(user.stripe_customer_id) : null;
 
   if (!customerId) {
     const customer = await stripe.customers.create({ email, metadata: { userId: String(userId) } });
@@ -48,10 +49,11 @@ export async function createCheckoutSession(
 export async function createPortalSession(userId: number): Promise<string> {
   const user = repo.findUserById(userId);
   if (!user) throw new Error('User not found');
-  if (!user.stripe_customer_id) throw new Error('No Stripe customer');
+  const customerId = user.stripe_customer_id ? decryptSecret(user.stripe_customer_id) : null;
+  if (!customerId) throw new Error('No Stripe customer');
 
   const session = await stripe.billingPortal.sessions.create({
-    customer: user.stripe_customer_id,
+    customer: customerId,
     return_url: config.clientUrl + '/dashboard',
   });
 
@@ -78,8 +80,8 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
 
       repo.updateUserPlan(user.id, 'pro');
       repo.updateUserStripeSubscription(user.id, subscriptionId, 'active');
-      repo.insertAuditLog(user.id, user.email, 'stripe_checkout_completed', 'user', user.id, `subscription: ${subscriptionId}`);
-      logger.info(`[Stripe] User ${user.email} upgraded to pro (subscription: ${subscriptionId})`);
+      repo.insertAuditLog(user.id, user.email, 'stripe_checkout_completed', 'user', user.id, `subscription: ${subscriptionId.slice(0, 12)}...`);
+      logger.info(`[Stripe] User ${user.email} upgraded to pro`);
       break;
     }
 
@@ -98,7 +100,7 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
       if (status === 'canceled' || status === 'unpaid') {
         repo.updateUserPlan(user.id, 'free');
         repo.insertAuditLog(user.id, user.email, 'stripe_subscription_canceled', 'user', user.id, `status: ${status}`);
-        logger.info(`[Stripe] User ${user.email} downgraded to free (status: ${status})`);
+        logger.info(`[Stripe] User ${user.email} downgraded to free`);
       } else {
         repo.insertAuditLog(user.id, user.email, 'stripe_subscription_updated', 'user', user.id, `status: ${status}`);
       }
@@ -117,7 +119,7 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
       repo.updateUserPlan(user.id, 'free');
       repo.updateUserStripeSubscription(user.id, null, null);
       repo.insertAuditLog(user.id, user.email, 'stripe_subscription_deleted', 'user', user.id);
-      logger.info(`[Stripe] User ${user.email} subscription deleted, downgraded to free`);
+      logger.info(`[Stripe] User ${user.email} downgraded to free (subscription deleted)`);
       break;
     }
   }
