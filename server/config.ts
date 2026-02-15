@@ -13,8 +13,9 @@ export interface BitbucketConfig {
 export interface Config {
   port: number;
   nodeEnv: string;
+  host: string;
   clientUrl: string;
-  trustProxy: number;
+  trustProxy: number | string | boolean;
   dbPath: string;
   anthropicApiKey: string;
   openaiApiKey: string;
@@ -34,11 +35,24 @@ export interface Config {
   stripeWebhookSecret: string;
 }
 
+function parseTrustProxy(raw: string | undefined): number | string | boolean {
+  if (raw === undefined || raw.trim() === '') {
+    return 0;
+  }
+
+  const normalized = raw.trim().toLowerCase();
+  if (normalized === 'true') return true;
+  if (normalized === 'false') return false;
+  if (/^\d+$/.test(normalized)) return parseInt(normalized, 10);
+  return raw.trim();
+}
+
 const config: Config = {
   port: parseInt(process.env.PORT || '3000', 10),
   nodeEnv: process.env.NODE_ENV || 'development',
+  host: process.env.HOST || (process.env.NODE_ENV === 'production' ? '0.0.0.0' : '127.0.0.1'),
   clientUrl: process.env.CLIENT_URL || 'http://localhost:5173',
-  trustProxy: parseInt(process.env.TRUST_PROXY || (process.env.NODE_ENV === 'production' ? '1' : '0'), 10),
+  trustProxy: parseTrustProxy(process.env.TRUST_PROXY),
   dbPath: process.env.DB_PATH || path.join(__dirname, 'db', 'kanban.db'),
   anthropicApiKey: process.env.ANTHROPIC_API_KEY || '',
   openaiApiKey: process.env.OPENAI_API_KEY || '',

@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import http from 'http';
 import path from 'path';
+import crypto from 'crypto';
 import config from './config';
 import { migrate } from './db/migrations';
 import db from './db/sqlite';
@@ -36,13 +37,56 @@ import userWebhooksRouter from './routes/user-webhooks';
 import searchRouter from './routes/search';
 import exportRouter from './routes/export';
 import projectSetupRouter from './routes/project-setup';
-import { stripeWebhookHandler } from './routes/stripe-webhook';
+import { stripeWebhookHandler, stripeWebhookLimiter } from './routes/stripe-webhook';
 import { apiLimiter } from './middleware/rate-limit';
 import { requireAuth } from './middleware/auth';
 import { requireProject } from './middleware/project';
 import { maintenanceGuard } from './middleware/maintenance';
 import { csrfGuard } from './middleware/csrf';
 import { isAllowedProjectRepoId } from './security/project-repo';
+
+function isLoopbackHostname(hostname: string): boolean {
+  const normalized = hostname.toLowerCase();
+  return normalized === 'localhost' || normalized === '127.0.0.1' || normalized === '::1';
+}
+
+function buildAllowedCorsOrigins(): Set<string> {
+  const origins = new Set<string>();
+  try {
+    const base = new URL(config.clientUrl);
+    origins.add(base.origin);
+
+    if (isLoopbackHostname(base.hostname)) {
+      const port = base.port ? `:${base.port}` : '';
+      origins.add(`${base.protocol}//localhost${port}`);
+      origins.add(`${base.protocol}//127.0.0.1${port}`);
+      origins.add(`${base.protocol}//[::1]${port}`);
+    }
+  } catch {
+    logger.error('[Security] Invalid CLIENT_URL configuration for CORS checks.');
+  }
+
+  const extraOrigins = (process.env.CORS_ALLOWED_ORIGINS || '')
+    .split(',')
+    .map(v => v.trim())
+    .filter(Boolean);
+  for (const origin of extraOrigins) {
+    origins.add(origin);
+  }
+
+  return origins;
+}
+
+function buildConnectSrc(): string[] {
+  const values = ["'self'"];
+  try {
+    const host = new URL(config.clientUrl).host;
+    values.push(`ws://${host}`, `wss://${host}`);
+  } catch {
+    logger.error('[Security] Invalid CLIENT_URL configuration for CSP connect-src checks.');
+  }
+  return values;
+}
 
 // Validate JWT secret in production
 if (config.nodeEnv === 'production' && (!config.jwtSecret || config.jwtSecret === 'dev-secret-change-me-in-production' || config.jwtSecret.length < 64)) {
@@ -71,6 +115,9 @@ const app = express();
 
 // Trust proxy setting is environment-driven; default is 0 outside production.
 app.set('trust proxy', config.trustProxy);
+if (config.nodeEnv !== 'production' && config.trustProxy !== 0 && config.trustProxy !== false) {
+  logger.warn('[Security] TRUST_PROXY is enabled outside production. Keep this disabled for local-only development.');
+}
 
 const server = http.createServer(app);
 
@@ -80,16 +127,27 @@ initSocket(server);
 // Security headers via helmet
 // NOTE: styleSrc 'unsafe-inline' is required by Tailwind CSS 4 runtime styles.
 // This is acceptable since scriptSrc does NOT allow unsafe-inline.
+const cspDirectives: Record<string, string[]> = {
+  defaultSrc: ["'self'"],
+  scriptSrc: ["'self'"],
+  styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+  fontSrc: ["'self'", 'https://fonts.gstatic.com'],
+  imgSrc: ["'self'", 'data:', 'https:'],
+  connectSrc: buildConnectSrc(),
+  objectSrc: ["'none'"],
+  baseUri: ["'self'"],
+  frameAncestors: ["'none'"],
+  formAction: ["'self'"],
+  manifestSrc: ["'self'"],
+};
+
+if (config.nodeEnv === 'production') {
+  cspDirectives.upgradeInsecureRequests = [];
+}
+
 app.use(helmet({
   contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-      fontSrc: ["'self'", "https://fonts.gstatic.com"],
-      imgSrc: ["'self'", "data:", "https:"],
-      connectSrc: ["'self'", `ws://${new URL(config.clientUrl).host}`, `wss://${new URL(config.clientUrl).host}`],
-    },
+    directives: cspDirectives,
   },
   hsts: config.nodeEnv === 'production' ? { maxAge: 31536000, includeSubDomains: true, preload: true } : false,
   frameguard: { action: 'deny' },
@@ -102,8 +160,35 @@ app.use((_req: Request, res: Response, next: NextFunction) => {
   next();
 });
 
+// Request correlation id for incident investigations
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const headerRequestId = typeof req.headers['x-request-id'] === 'string' ? req.headers['x-request-id'].trim() : '';
+  const requestId = headerRequestId || crypto.randomUUID();
+  res.setHeader('X-Request-Id', requestId);
+  next();
+});
+
 // Middleware
-app.use(cors({ origin: config.clientUrl, credentials: true }));
+const allowedCorsOrigins = buildAllowedCorsOrigins();
+app.use(cors({
+  credentials: true,
+  origin: (origin, callback) => {
+    if (!origin) {
+      callback(null, true);
+      return;
+    }
+
+    if (allowedCorsOrigins.has(origin)) {
+      callback(null, true);
+      return;
+    }
+
+    logger.security('cors_blocked', { origin });
+    callback(null, false);
+  },
+  methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  optionsSuccessStatus: 204,
+}));
 
 // Block direct probes to .env files. For browser navigation, redirect to dashboard.
 const SENSITIVE_ENV_PATH_RE = /(^|\/)\.env(?:\.[^/]+)?(?:\/)?$/i;
@@ -120,7 +205,13 @@ app.use((req: Request, res: Response, next: NextFunction) => {
     return;
   }
 
-  logger.warn(`[Security] Blocked attempt to access sensitive path: ${requestPath}`);
+  logger.security('sensitive_path_probe_blocked', {
+    method: req.method,
+    path: requestPath,
+    origin: req.headers.origin || null,
+    referer: req.headers.referer || null,
+    ip: req.ip,
+  });
 
   const accept = req.headers.accept || '';
   if (req.method === 'GET' && typeof accept === 'string' && accept.includes('text/html')) {
@@ -132,7 +223,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 });
 
 // Stripe webhook — must be before express.json() for raw body signature verification
-app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), stripeWebhookHandler);
+app.post('/api/webhooks/stripe', stripeWebhookLimiter, express.raw({ type: 'application/json' }), stripeWebhookHandler);
 
 app.use(express.json({
   limit: '256kb',
@@ -266,8 +357,8 @@ if (config.nodeEnv === 'production') {
 // Start queue polling
 startQueue();
 
-server.listen(config.port, () => {
-  logger.info(`CrabCreate running on http://localhost:${config.port}`);
+server.listen(config.port, config.host, () => {
+  logger.info(`CrabCreate running on http://${config.host}:${config.port}`);
   logger.info(`Environment: ${config.nodeEnv}`);
 });
 

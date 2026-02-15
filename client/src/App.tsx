@@ -97,7 +97,7 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
 
 /** Main dashboard */
 function Dashboard() {
-  const { user } = useAuth();
+  const { user, refreshSession } = useAuth();
   const { openLogin } = useLoginModal();
   const [viewMode, setViewMode] = useState<'board' | 'list' | 'calendar' | 'timeline'>('board');
   const [search, setSearch] = useState('');
@@ -223,9 +223,10 @@ function Dashboard() {
     const params = new URLSearchParams(window.location.search);
     if (params.get('checkout') === 'success') {
       addNotification(t.billingCheckoutSuccess, 'success');
+      refreshSession().catch(() => {});
       window.history.replaceState({}, '', '/dashboard');
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [addNotification, t.billingCheckoutSuccess, refreshSession]);
 
   const handleLaunch = async (id: number) => {
     if (!user || user.isVisitor) { openLogin(); return; }

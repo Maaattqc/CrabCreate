@@ -84,13 +84,14 @@ export default function Header({ search, onSearchChange, viewMode, onViewModeCha
   const { t, lang, setLang } = useLanguage();
   const { animations, setAnimations } = useAnimations();
   const { aiDesign, setAIDesign } = useAIDesign();
-  const { user, logout, updatePreferences } = useAuth();
+  const { user, logout, updatePreferences, refreshSession } = useAuth();
   const { openLogin } = useLoginModal();
   const { projects, currentProject, invitations, switchProject } = useProject();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const [projectMenuOpen, setProjectMenuOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  const [billingNotice, setBillingNotice] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const projectMenuRef = useRef<HTMLDivElement>(null);
   const exportRef = useRef<HTMLDivElement>(null);
@@ -133,6 +134,67 @@ export default function Header({ search, onSearchChange, viewMode, onViewModeCha
   const handleToggleAIDesign = () => {
     setAIDesign(!aiDesign);
     updatePreferences({ aiDesign: !aiDesign }).catch(() => {});
+  };
+
+  const resolveBillingError = async (raw: unknown): Promise<string> => {
+    const errorMessage = typeof raw === 'string' ? raw : '';
+    if (errorMessage === 'Already on Pro plan') {
+      await refreshSession().catch(() => {});
+      return t.billingAlreadyOnPro;
+    }
+    return errorMessage || t.error;
+  };
+
+  const redirectToStripeIfSafe = (url: unknown): boolean => {
+    if (typeof url !== 'string' || !url.trim()) return false;
+    try {
+      const parsed = new URL(url);
+      if (['checkout.stripe.com', 'billing.stripe.com'].includes(parsed.hostname)) {
+        window.location.href = url;
+        return true;
+      }
+    } catch {
+      return false;
+    }
+    return false;
+  };
+
+  const openBillingPortal = async () => {
+    setBillingNotice(null);
+    try {
+      const res = await fetch('/api/billing/portal', { method: 'POST', credentials: 'include' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setBillingNotice(await resolveBillingError((data as { error?: unknown }).error));
+        return;
+      }
+      if (!redirectToStripeIfSafe((data as { url?: unknown }).url)) {
+        setBillingNotice(t.error);
+      }
+    } catch {
+      setBillingNotice(t.error);
+    }
+  };
+
+  const startBillingCheckout = async () => {
+    setBillingNotice(null);
+    try {
+      const res = await fetch('/api/billing/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setBillingNotice(await resolveBillingError((data as { error?: unknown }).error));
+        return;
+      }
+      if (!redirectToStripeIfSafe((data as { url?: unknown }).url)) {
+        setBillingNotice(t.error);
+      }
+    } catch {
+      setBillingNotice(t.error);
+    }
   };
 
   return (
@@ -357,7 +419,16 @@ export default function Header({ search, onSearchChange, viewMode, onViewModeCha
       {user && (
         <div className="relative" ref={menuRef}>
           <button
-            onClick={() => setMenuOpen(!menuOpen)}
+            onClick={() => {
+              setMenuOpen(prev => {
+                const next = !prev;
+                if (next) {
+                  setBillingNotice(null);
+                  refreshSession().catch(() => {});
+                }
+                return next;
+              });
+            }}
             className="flex items-center gap-2 pl-3 pr-2 py-1.5 rounded-lg border border-th-border hover:bg-subtle-hover transition-colors"
           >
             <div className="w-6 h-6 rounded-full bg-gradient-to-br from-amber-500 to-red-500 flex items-center justify-center">
@@ -462,18 +533,9 @@ export default function Header({ search, onSearchChange, viewMode, onViewModeCha
                   </span>
                 </div>
 
-                {user.plan === 'pro' && (
+                {user.plan !== 'free' && (
                   <button
-                    onClick={async () => {
-                      try {
-                        const res = await fetch('/api/billing/portal', { method: 'POST', credentials: 'include' });
-                        const data = await res.json();
-                        if (data.url) {
-                          try { const u = new URL(data.url); if (['checkout.stripe.com', 'billing.stripe.com'].includes(u.hostname)) window.location.href = data.url; } catch { /* invalid */ }
-                        }
-                      } catch { /* ignore */ }
-                      setMenuOpen(false);
-                    }}
+                    onClick={openBillingPortal}
                     className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-subtle-hover transition-colors"
                   >
                     <ArrowUpRight size={16} className="text-tx-faint" />
@@ -483,25 +545,16 @@ export default function Header({ search, onSearchChange, viewMode, onViewModeCha
 
                 {user.plan === 'free' && (
                   <button
-                    onClick={async () => {
-                      try {
-                        const res = await fetch('/api/billing/checkout', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          credentials: 'include',
-                        });
-                        const data = await res.json();
-                        if (data.url) {
-                          try { const u = new URL(data.url); if (['checkout.stripe.com', 'billing.stripe.com'].includes(u.hostname)) window.location.href = data.url; } catch { /* invalid */ }
-                        }
-                      } catch { /* ignore */ }
-                      setMenuOpen(false);
-                    }}
+                    onClick={startBillingCheckout}
                     className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-amber-500/10 transition-colors"
                   >
                     <ArrowUpRight size={16} className="text-amber-400" />
                     <span className="text-sm text-amber-400 font-medium">{t.billingUpgradeToPro}</span>
                   </button>
+                )}
+
+                {billingNotice && (
+                  <p className="px-3 pt-1 text-[11px] leading-4 text-amber-400">{billingNotice}</p>
                 )}
               </div>
 

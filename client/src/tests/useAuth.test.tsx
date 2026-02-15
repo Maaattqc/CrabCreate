@@ -3,6 +3,7 @@ import { renderHook, act, waitFor } from '@testing-library/react';
 import { AuthProvider, useAuth } from '../hooks/useAuth';
 import type { ReactNode } from 'react';
 import type { AuthUser } from '../hooks/useAuth';
+import { AUTH_UNAUTHORIZED_EVENT } from '../api/http';
 
 const wrapper = ({ children }: { children: ReactNode }) => (
   <AuthProvider>{children}</AuthProvider>
@@ -203,5 +204,53 @@ describe('useAuth', () => {
     });
 
     expect(result.current.user?.preferences).toEqual(updatedPrefs);
+  });
+
+  it('refreshSession updates user plan from latest /me data', async () => {
+    const upgradedUser: AuthUser = { ...mockUser, plan: 'pro', stripeSubscriptionStatus: 'active' };
+
+    vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ user: mockUser }),
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ user: upgradedUser }),
+      } as Response);
+
+    const { result } = renderHook(() => useAuth(), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.user?.plan).toBe('free');
+    });
+
+    await act(async () => {
+      await result.current.refreshSession();
+    });
+
+    expect(result.current.user?.plan).toBe('pro');
+    expect(result.current.user?.stripeSubscriptionStatus).toBe('active');
+  });
+
+  it('resets user on unauthorized event', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({ user: mockUser }),
+    } as Response);
+
+    const { result } = renderHook(() => useAuth(), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.user).toEqual(mockUser);
+    });
+
+    act(() => {
+      window.dispatchEvent(new CustomEvent(AUTH_UNAUTHORIZED_EVENT, {
+        detail: { status: 401, url: '/api/test' },
+      }));
+    });
+
+    expect(result.current.user).toBeNull();
   });
 });

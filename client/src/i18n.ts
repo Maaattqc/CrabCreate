@@ -449,6 +449,7 @@ export interface Translations {
   billingManage: string;
   billingCurrentPlan: string;
   billingUpgradeToPro: string;
+  billingAlreadyOnPro: string;
   billingCheckoutSuccess: string;
   billingCheckoutCanceled: string;
   billingPlanLimitTickets: string;
@@ -1104,9 +1105,10 @@ export const translations: Record<Lang, Translations> = {
     settingsDisabled: 'Désactivé',
 
     billingSubscribe: 'S\'abonner',
-    billingManage: 'Gérer l\'abonnement',
+    billingManage: 'Modifier l\'abonnement actuel',
     billingCurrentPlan: 'Plan actuel',
     billingUpgradeToPro: 'Passer au Pro',
+    billingAlreadyOnPro: 'Vous etes deja abonne au plan Pro.',
     billingCheckoutSuccess: 'Abonnement Pro activé avec succès !',
     billingCheckoutCanceled: 'Paiement annulé.',
     billingPlanLimitTickets: 'Limite de tickets atteinte pour votre plan.',
@@ -1737,9 +1739,10 @@ export const translations: Record<Lang, Translations> = {
     settingsDisabled: 'Disabled',
 
     billingSubscribe: 'Subscribe',
-    billingManage: 'Manage subscription',
+    billingManage: 'Manage current subscription',
     billingCurrentPlan: 'Current plan',
     billingUpgradeToPro: 'Upgrade to Pro',
+    billingAlreadyOnPro: 'You are already subscribed to the Pro plan.',
     billingCheckoutSuccess: 'Pro subscription activated successfully!',
     billingCheckoutCanceled: 'Payment canceled.',
     billingPlanLimitTickets: 'Ticket limit reached for your plan.',

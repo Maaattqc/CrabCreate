@@ -26,7 +26,7 @@ router.post('/checkout', billingLimiter, async (req: Request, res: Response) => 
     return;
   }
 
-  if (user.plan === 'pro') {
+  if (user.plan !== 'free') {
     res.status(400).json({ error: 'Already on Pro plan' });
     return;
   }
@@ -41,6 +41,10 @@ router.post('/checkout', billingLimiter, async (req: Request, res: Response) => 
     );
     res.json({ url });
   } catch (err) {
+    if (err instanceof Error && err.message === 'Already on Pro plan') {
+      res.status(409).json({ error: 'Already on Pro plan' });
+      return;
+    }
     logger.error('[Billing] Checkout error:', err);
     res.status(500).json({ error: 'Failed to create checkout session' });
   }

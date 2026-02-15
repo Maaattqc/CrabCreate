@@ -14,6 +14,7 @@ vi.mock('../hooks/useLanguage', () => ({
   useLanguage: () => ({
     lang: 'fr',
     t: {
+      error: 'Erreur',
       pricingTitle: 'Tarifs',
       pricingSub: 'Choisissez votre plan',
       pricingFree: 'Free',
@@ -33,6 +34,7 @@ vi.mock('../hooks/useLanguage', () => ({
       billingCurrentPlan: 'Plan actuel',
       billingSubscribe: "S'abonner",
       billingLoading: 'Chargement...',
+      billingAlreadyOnPro: 'Vous etes deja abonne au plan Pro.',
       billingCheckoutCanceled: 'Paiement annulé',
       settingsUnlimited: 'Illimité',
     },
@@ -207,5 +209,38 @@ describe('PricingPage', () => {
     render(<PricingPage />, { wrapper });
 
     expect(screen.getByText('Contactez-nous')).toBeInTheDocument();
+  });
+
+  it('shows already subscribed message and refreshes session when checkout is refused', async () => {
+    const refreshSession = vi.fn().mockResolvedValue(undefined);
+    mockUseAuth.mockReturnValue({
+      user: { id: 1, email: 'test@example.com', plan: 'free', isAdmin: false, stripeSubscriptionStatus: null, preferences: {} },
+      loading: false,
+      refreshSession,
+    });
+
+    vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          plan_free_tickets: 5, plan_free_pipelines: 1,
+          plan_pro_tickets: 50, plan_pro_pipelines: 3,
+          plan_enterprise_tickets: -1, plan_enterprise_pipelines: 10,
+        }),
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 409,
+        json: async () => ({ error: 'Already on Pro plan' }),
+      } as Response);
+
+    render(<PricingPage />, { wrapper });
+
+    fireEvent.click(screen.getByText("S'abonner"));
+
+    await waitFor(() => {
+      expect(refreshSession).toHaveBeenCalled();
+      expect(screen.getByText('Vous etes deja abonne au plan Pro.')).toBeInTheDocument();
+    });
   });
 });

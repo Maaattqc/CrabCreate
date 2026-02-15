@@ -1,11 +1,14 @@
 import type { FavoriteTicket } from '../types';
+import { apiJson } from './http';
 
 const API = '/api';
 
 async function request<T>(url: string, options: RequestInit = {}): Promise<T> {
-  const res = await fetch(url, { ...options, headers: { 'Content-Type': 'application/json', ...options.headers as Record<string, string> }, credentials: 'include' });
-  if (!res.ok) { const err = await res.json().catch(() => ({ error: res.statusText })); throw new Error(err.error || 'Request failed'); }
-  return res.json();
+  return apiJson<T>(url, {
+    ...options,
+    headers: { 'Content-Type': 'application/json', ...(options.headers as Record<string, string> || {}) },
+    defaultErrorMessage: 'Request failed',
+  });
 }
 
 export function getFavorites(): Promise<FavoriteTicket[]> {

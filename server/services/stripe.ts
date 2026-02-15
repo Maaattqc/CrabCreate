@@ -6,6 +6,33 @@ import logger from './logger';
 
 const stripe = new Stripe(config.stripeSecretKey);
 
+const BLOCKED_SUBSCRIPTION_STATUSES = new Set<Stripe.Subscription.Status>([
+  'active',
+  'trialing',
+  'past_due',
+  'incomplete',
+  'paused',
+]);
+
+function hasBlockingSubscription(status: Stripe.Subscription.Status | null | undefined): boolean {
+  return !!status && BLOCKED_SUBSCRIPTION_STATUSES.has(status);
+}
+
+async function ensureNoDuplicateProSubscription(userId: number, customerId: string): Promise<void> {
+  const subscriptions = await stripe.subscriptions.list({
+    customer: customerId,
+    status: 'all',
+    limit: 20,
+  });
+
+  const existing = subscriptions.data.find((sub) => hasBlockingSubscription(sub.status));
+  if (!existing) return;
+
+  // Keep local subscription metadata in sync when Stripe is ahead of local DB state.
+  repo.updateUserStripeSubscription(userId, existing.id, existing.status);
+  throw new Error('Already on Pro plan');
+}
+
 export async function createCheckoutSession(
   userId: number,
   email: string,
@@ -14,6 +41,10 @@ export async function createCheckoutSession(
 ): Promise<string> {
   const user = repo.findUserById(userId);
   if (!user) throw new Error('User not found');
+  if (user.plan === 'pro') throw new Error('Already on Pro plan');
+  if (hasBlockingSubscription(user.stripe_subscription_status as Stripe.Subscription.Status | null)) {
+    throw new Error('Already on Pro plan');
+  }
 
   let customerId = user.stripe_customer_id ? decryptSecret(user.stripe_customer_id) : null;
 
@@ -22,6 +53,8 @@ export async function createCheckoutSession(
     customerId = customer.id;
     repo.updateUserStripeCustomerId(userId, customerId);
   }
+
+  await ensureNoDuplicateProSubscription(userId, customerId);
 
   const session = await stripe.checkout.sessions.create({
     customer: customerId,

@@ -15,6 +15,7 @@ import type { UserPreferences } from '../types';
 const router = Router();
 const MAX_AUTH_CODE_ATTEMPTS = 3;
 const DEV_LOGIN_ROUTE_ENVS = new Set(['development', 'test']);
+const FORWARDED_HEADERS = ['x-forwarded-for', 'x-forwarded-host', 'x-real-ip', 'forwarded'] as const;
 
 function normalizeIp(ip: string): string {
   return ip.startsWith('::ffff:') ? ip.slice(7) : ip;
@@ -25,7 +26,48 @@ function isLoopbackIp(ip: string): boolean {
   return normalized === '127.0.0.1' || normalized === '::1';
 }
 
+function isLoopbackHost(host: string): boolean {
+  const normalized = host.trim().toLowerCase();
+  return normalized === 'localhost' || normalized === '127.0.0.1' || normalized === '[::1]' || normalized === '::1';
+}
+
+function parseHostHeader(hostHeader: string): string {
+  const raw = hostHeader.trim().toLowerCase();
+  if (!raw) return '';
+  if (raw.startsWith('[')) {
+    const idx = raw.indexOf(']');
+    return idx > 0 ? raw.slice(0, idx + 1) : raw;
+  }
+  return raw.split(':')[0];
+}
+
+function isLoopbackUrl(raw: string): boolean {
+  try {
+    const parsed = new URL(raw);
+    return isLoopbackHost(parsed.hostname);
+  } catch {
+    return false;
+  }
+}
+
+function trustProxyEnabled(): boolean {
+  return config.trustProxy !== 0 && config.trustProxy !== false;
+}
+
+function canRegisterDevLoginRoutes(): boolean {
+  return DEV_LOGIN_ROUTE_ENVS.has(config.nodeEnv) && !trustProxyEnabled();
+}
+
+function hasForwardedHeaders(req: Request): boolean {
+  return FORWARDED_HEADERS.some((header) => {
+    const value = req.headers[header];
+    return typeof value === 'string' && value.trim().length > 0;
+  });
+}
+
 function isDevLoginEnabled(): boolean {
+  if (!canRegisterDevLoginRoutes()) return false;
+
   const configured = repo.getConfig('dev_login_enabled');
   if (configured !== undefined) {
     return configured === '1';
@@ -40,11 +82,62 @@ function ensureDevLoginAccess(req: Request, res: Response): boolean {
     return false;
   }
 
+  if (hasForwardedHeaders(req)) {
+    logger.security('dev_login_blocked_forwarded_headers', {
+      host: req.headers.host || null,
+      origin: req.headers.origin || null,
+      referer: req.headers.referer || null,
+      ip: req.ip,
+      socketIp: req.socket.remoteAddress || null,
+    });
+    res.status(403).json({ error: 'Dev login is unavailable behind a proxy.' });
+    return false;
+  }
+
+  const host = typeof req.headers.host === 'string' ? parseHostHeader(req.headers.host) : '';
+  if (!host || !isLoopbackHost(host)) {
+    logger.security('dev_login_blocked_host', {
+      hostHeader: req.headers.host || null,
+      origin: req.headers.origin || null,
+      referer: req.headers.referer || null,
+      ip: req.ip,
+    });
+    res.status(403).json({ error: 'Dev login allowed from localhost only.' });
+    return false;
+  }
+
+  const origin = typeof req.headers.origin === 'string' ? req.headers.origin : '';
+  if (origin && !isLoopbackUrl(origin)) {
+    logger.security('dev_login_blocked_origin', {
+      hostHeader: req.headers.host || null,
+      origin,
+      ip: req.ip,
+    });
+    res.status(403).json({ error: 'Dev login allowed from localhost only.' });
+    return false;
+  }
+
+  const referer = typeof req.headers.referer === 'string' ? req.headers.referer : '';
+  if (referer && !isLoopbackUrl(referer)) {
+    logger.security('dev_login_blocked_referer', {
+      hostHeader: req.headers.host || null,
+      referer,
+      ip: req.ip,
+    });
+    res.status(403).json({ error: 'Dev login allowed from localhost only.' });
+    return false;
+  }
+
   // Check both proxy-resolved IP and raw TCP socket to prevent X-Forwarded-For spoofing
   const proxyIp = req.ip || '';
   const socketIp = req.socket.remoteAddress || '';
   if (!isLoopbackIp(proxyIp) || !isLoopbackIp(socketIp)) {
-    logger.warn(`[Security] Blocked non-local dev-login attempt from proxy=${proxyIp} socket=${socketIp}`);
+    logger.security('dev_login_blocked_non_loopback_ip', {
+      proxyIp,
+      socketIp,
+      hostHeader: req.headers.host || null,
+      origin: req.headers.origin || null,
+    });
     res.status(403).json({ error: 'Dev login allowed from localhost only.' });
     return false;
   }
@@ -222,8 +315,8 @@ router.post('/verify-code', verifyCodeLimiter, validate(verifyCodeSchema), (req:
   res.json({ user: userResponse(user) });
 });
 
-// Dev-login routes â€” only registered for local development/test
-if (DEV_LOGIN_ROUTE_ENVS.has(config.nodeEnv)) {
+// Dev-login routes â€” only registered for local development/test without trusted proxy
+if (canRegisterDevLoginRoutes()) {
   // POST /api/auth/dev-login â€” auto-login with ADMIN_EMAIL
   router.post('/dev-login', (req: Request, res: Response) => {
     if (!ensureDevLoginAccess(req, res)) return;
@@ -290,6 +383,8 @@ if (DEV_LOGIN_ROUTE_ENVS.has(config.nodeEnv)) {
     repo.insertAuditLog(user.id, user.email, 'dev_login', 'user', user.id, 'Dev new client login', req.ip);
     res.json({ user: userResponse(user) });
   });
+} else if (DEV_LOGIN_ROUTE_ENVS.has(config.nodeEnv)) {
+  logger.security('dev_login_routes_disabled_due_to_trust_proxy', { trustProxy: config.trustProxy });
 }
 
 // POST /api/auth/logout

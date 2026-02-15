@@ -5,11 +5,13 @@ import type { Request, Response } from 'express';
 const {
   mockCustomersCreate,
   mockCheckoutSessionsCreate,
+  mockSubscriptionsList,
   mockPortalSessionsCreate,
   mockWebhooksConstructEvent,
 } = vi.hoisted(() => ({
   mockCustomersCreate: vi.fn(),
   mockCheckoutSessionsCreate: vi.fn(),
+  mockSubscriptionsList: vi.fn(),
   mockPortalSessionsCreate: vi.fn(),
   mockWebhooksConstructEvent: vi.fn(),
 }));
@@ -19,6 +21,7 @@ vi.mock('stripe', () => {
     return {
       customers: { create: mockCustomersCreate },
       checkout: { sessions: { create: mockCheckoutSessionsCreate } },
+      subscriptions: { list: mockSubscriptionsList },
       billingPortal: { sessions: { create: mockPortalSessionsCreate } },
       webhooks: { constructEvent: mockWebhooksConstructEvent },
     };
@@ -84,6 +87,7 @@ function mockUser(overrides: Partial<{ id: number; stripe_customer_id: string | 
 describe('createCheckoutSession', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockSubscriptionsList.mockResolvedValue({ data: [] });
   });
 
   it('throws when user not found', async () => {
@@ -155,6 +159,39 @@ describe('createCheckoutSession', () => {
         ],
       }),
     );
+  });
+
+  it('blocks duplicate checkout when user is already pro locally', async () => {
+    vi.mocked(repo.findUserById).mockReturnValue(mockUser({ plan: 'pro', stripe_customer_id: 'cus_existing' }));
+
+    await expect(createCheckoutSession(1, 'test@example.com', '/success', '/cancel')).rejects.toThrow('Already on Pro plan');
+
+    expect(mockCheckoutSessionsCreate).not.toHaveBeenCalled();
+  });
+
+  it('blocks duplicate checkout when Stripe already has an active subscription', async () => {
+    vi.mocked(repo.findUserById).mockReturnValue(mockUser({ stripe_customer_id: 'cus_existing' }));
+    mockSubscriptionsList.mockResolvedValue({
+      data: [{ id: 'sub_active_123', status: 'active' }],
+    });
+
+    await expect(createCheckoutSession(1, 'test@example.com', '/success', '/cancel')).rejects.toThrow('Already on Pro plan');
+
+    expect(repo.updateUserStripeSubscription).toHaveBeenCalledWith(1, 'sub_active_123', 'active');
+    expect(mockCheckoutSessionsCreate).not.toHaveBeenCalled();
+  });
+
+  it('allows checkout when previous Stripe subscriptions are canceled', async () => {
+    vi.mocked(repo.findUserById).mockReturnValue(mockUser({ stripe_customer_id: 'cus_existing' }));
+    mockSubscriptionsList.mockResolvedValue({
+      data: [{ id: 'sub_old_123', status: 'canceled' }],
+    });
+    mockCheckoutSessionsCreate.mockResolvedValue({ url: 'https://checkout.stripe.com/session' });
+
+    const url = await createCheckoutSession(1, 'test@example.com', '/success', '/cancel');
+
+    expect(url).toBe('https://checkout.stripe.com/session');
+    expect(mockCheckoutSessionsCreate).toHaveBeenCalledTimes(1);
   });
 });
 

@@ -35,10 +35,11 @@ const DEFAULTS: PlanConfig = {
 
 export default function PricingPage() {
   const { t } = useLanguage();
-  const { user } = useAuth();
+  const { user, refreshSession } = useAuth();
   const [searchParams] = useSearchParams();
   const [cfg, setCfg] = useState<PlanConfig>(DEFAULTS);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [checkoutError, setCheckoutError] = useState('');
 
   useEffect(() => {
     fetch('/api/plans')
@@ -53,23 +54,43 @@ export default function PricingPage() {
 
   const handleCheckout = async () => {
     setCheckoutLoading(true);
+    setCheckoutError('');
     try {
       const res = await fetch('/api/billing/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
       });
-      const data = await res.json();
-      if (data.url) {
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const errorMessage = typeof (data as { error?: unknown }).error === 'string'
+          ? (data as { error: string }).error
+          : t.error;
+
+        if (errorMessage === 'Already on Pro plan') {
+          await refreshSession().catch(() => {});
+          setCheckoutError(t.billingAlreadyOnPro);
+        } else {
+          setCheckoutError(errorMessage || t.error);
+        }
+        setCheckoutLoading(false);
+        return;
+      }
+
+      if ((data as { url?: unknown }).url) {
         try {
-          const parsed = new URL(data.url);
+          const parsed = new URL((data as { url: string }).url);
           if (['checkout.stripe.com', 'billing.stripe.com'].includes(parsed.hostname)) {
-            window.location.href = data.url;
+            window.location.href = (data as { url: string }).url;
+            return;
           }
         } catch { /* invalid URL */ }
       }
+      setCheckoutError(t.error);
+      setCheckoutLoading(false);
     } catch {
       setCheckoutLoading(false);
+      setCheckoutError(t.error);
     }
   };
 
@@ -184,6 +205,12 @@ export default function PricingPage() {
         {checkoutCanceled && (
           <div className="max-w-md mx-auto mb-8 p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg text-sm text-amber-400 text-center">
             {t.billingCheckoutCanceled}
+          </div>
+        )}
+
+        {checkoutError && (
+          <div className="max-w-md mx-auto mb-8 p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg text-sm text-amber-400 text-center">
+            {checkoutError}
           </div>
         )}
 

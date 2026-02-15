@@ -2,6 +2,7 @@ import { useRef, useCallback } from 'react';
 import { Bold, Italic, Code, Link, List, Eye, Pencil, HelpCircle } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import type { Components } from 'react-markdown';
 import { useMarkdown } from '../../hooks/useMarkdown';
 import { useLanguage } from '../../hooks/useLanguage';
 
@@ -12,6 +13,36 @@ interface MarkdownEditorProps {
   maxLength?: number;
   rows?: number;
   disabled?: boolean;
+}
+
+function sanitizeMarkdownUrl(rawHref: string | undefined): string | null {
+  if (!rawHref) return null;
+  const href = rawHref.trim();
+  if (!href) return null;
+
+  const normalized = href.replace(/\s+/g, '').toLowerCase();
+  if (
+    normalized.startsWith('javascript:') ||
+    normalized.startsWith('data:') ||
+    normalized.startsWith('vbscript:')
+  ) {
+    return null;
+  }
+
+  if (href.startsWith('/') || href.startsWith('#') || href.startsWith('?')) {
+    return href;
+  }
+
+  try {
+    const parsed = new URL(href);
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:' || parsed.protocol === 'mailto:') {
+      return href;
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
 }
 
 export default function MarkdownEditor({ value, onChange, placeholder, maxLength, rows = 6, disabled = false }: MarkdownEditorProps) {
@@ -62,6 +93,26 @@ export default function MarkdownEditor({ value, onChange, placeholder, maxLength
     { icon: Link, action: () => wrapSelection('[', '](url)'), title: 'Link' },
     { icon: List, action: () => insertTemplate('\n- '), title: 'List' },
   ];
+
+  const markdownComponents: Components = {
+    a: ({ href, children, ...props }) => {
+      const safeHref = sanitizeMarkdownUrl(href);
+      if (!safeHref) {
+        return <span {...props}>{children}</span>;
+      }
+      const isExternal = safeHref.startsWith('http://') || safeHref.startsWith('https://');
+      return (
+        <a
+          {...props}
+          href={safeHref}
+          target={isExternal ? '_blank' : undefined}
+          rel={isExternal ? 'noopener noreferrer nofollow ugc' : undefined}
+        >
+          {children}
+        </a>
+      );
+    },
+  };
 
   return (
     <div className="border border-th-border rounded-lg overflow-hidden bg-subtle">
@@ -115,7 +166,13 @@ export default function MarkdownEditor({ value, onChange, placeholder, maxLength
       {isPreview ? (
         <div className="p-3 min-h-[8rem] max-h-[20rem] overflow-y-auto prose prose-invert prose-sm max-w-none text-tx-secondary [&_h1]:text-tx-primary [&_h1]:text-lg [&_h1]:font-bold [&_h1]:mb-2 [&_h2]:text-tx-primary [&_h2]:text-base [&_h2]:font-semibold [&_h2]:mb-2 [&_h3]:text-tx-primary [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:mb-1 [&_strong]:text-tx-primary [&_code]:text-amber-400 [&_code]:bg-black/30 [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-xs [&_pre]:bg-black/30 [&_pre]:rounded-lg [&_pre]:p-3 [&_a]:text-amber-400 [&_a]:underline [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4 [&_li]:mb-1 [&_blockquote]:border-l-2 [&_blockquote]:border-amber-500/50 [&_blockquote]:pl-3 [&_blockquote]:italic [&_blockquote]:text-tx-faint">
           {value ? (
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>{value}</ReactMarkdown>
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              skipHtml
+              components={markdownComponents}
+            >
+              {value}
+            </ReactMarkdown>
           ) : (
             <p className="text-tx-ghost italic">{placeholder}</p>
           )}

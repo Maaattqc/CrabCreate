@@ -1,40 +1,24 @@
 import type { Ticket, TicketFilters, LogEntry, ChatMessage, ActivityItem, AnalyticsData, FileLock } from '../types';
+import { apiJson, getCurrentProjectId } from './http';
 
 const API = '/api';
-
-/** Get the current project ID from localStorage */
-function getProjectId(): string {
-  return localStorage.getItem('crab-current-project') || '';
-}
 
 interface RequestOptions extends RequestInit {
   headers?: Record<string, string>;
 }
 
 async function request<T>(url: string, options: RequestOptions = {}): Promise<T> {
-  const { headers, ...rest } = options;
-  const res = await fetch(url, {
-    ...rest,
-    headers: { 'Content-Type': 'application/json', ...headers },
-    credentials: 'include',
+  return apiJson<T>(url, {
+    ...options,
+    headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+    sessionErrorMessage: 'Session expired',
+    defaultErrorMessage: 'Request failed',
   });
-  if (res.status === 401) {
-    throw new Error('Session expired');
-  }
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: res.statusText }));
-    if (err.details && Array.isArray(err.details)) {
-      const msgs = err.details.map((d: { field: string; message: string }) => d.message).join('. ');
-      throw new Error(msgs);
-    }
-    throw new Error(err.error || 'Request failed');
-  }
-  return res.json();
 }
 
 /** Adds X-Project-Id header for project-scoped requests */
 function projectHeaders(extra: Record<string, string> = {}): Record<string, string> {
-  const pid = getProjectId();
+  const pid = getCurrentProjectId() || '';
   return pid ? { 'X-Project-Id': pid, ...extra } : extra;
 }
 

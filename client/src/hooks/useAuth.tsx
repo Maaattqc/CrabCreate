@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { disconnectSocket, reconnectSocket } from './useSocket';
+import { apiJson, apiVoid, AUTH_UNAUTHORIZED_EVENT } from '../api/http';
 
 export interface UserPreferences {
   lang?: 'fr' | 'en';
@@ -24,6 +25,7 @@ interface AuthContextType {
   loading: boolean;
   requestCode: (email: string) => Promise<{ message: string }>;
   verifyCode: (email: string, code: string) => Promise<AuthUser>;
+  refreshSession: () => Promise<AuthUser | null>;
   activateSession: (user: AuthUser) => void;
   updatePreferences: (prefs: Partial<UserPreferences>) => Promise<void>;
   logout: () => Promise<void>;
@@ -34,6 +36,7 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
   requestCode: async () => ({ message: '' }),
   verifyCode: async () => ({ id: 0, email: '', isAdmin: false, isVisitor: false, plan: 'free', stripeSubscriptionStatus: null, preferences: {} }),
+  refreshSession: async () => null,
   activateSession: () => {},
   updatePreferences: async () => {},
   logout: async () => {},
@@ -46,12 +49,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const sessionActivatedRef = useRef(false);
 
+  const refreshSession = useCallback(async (): Promise<AuthUser | null> => {
+    try {
+      const data = await apiJson<{ user: AuthUser }>(`${API}/me`, { defaultErrorMessage: 'Not authenticated' });
+      setUser(data.user);
+      return data.user;
+    } catch {
+      setUser(null);
+      return null;
+    }
+  }, []);
+
   useEffect(() => {
-    fetch(`${API}/me`, { credentials: 'include' })
-      .then(res => {
-        if (res.ok) return res.json();
-        throw new Error('Not authenticated');
-      })
+    apiJson<{ user: AuthUser }>(`${API}/me`, { defaultErrorMessage: 'Not authenticated' })
       .then(data => {
         if (!sessionActivatedRef.current) setUser(data.user);
       })
@@ -61,27 +71,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .finally(() => setLoading(false));
   }, []);
 
+  useEffect(() => {
+    const onUnauthorized = () => {
+      sessionActivatedRef.current = false;
+      disconnectSocket();
+      setUser(null);
+      setLoading(false);
+    };
+
+    window.addEventListener(AUTH_UNAUTHORIZED_EVENT, onUnauthorized as EventListener);
+    return () => {
+      window.removeEventListener(AUTH_UNAUTHORIZED_EVENT, onUnauthorized as EventListener);
+    };
+  }, []);
+
   const requestCode = useCallback(async (email: string) => {
-    const res = await fetch(`${API}/request-code`, {
+    return apiJson<{ message: string }>(`${API}/request-code`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ email }),
+      jsonBody: { email },
+      defaultErrorMessage: 'Request failed',
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Request failed');
-    return data;
   }, []);
 
   const verifyCode = useCallback(async (email: string, code: string): Promise<AuthUser> => {
-    const res = await fetch(`${API}/verify-code`, {
+    const data = await apiJson<{ user: AuthUser }>(`${API}/verify-code`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ email, code }),
+      jsonBody: { email, code },
+      defaultErrorMessage: 'Verification failed',
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Verification failed');
     return data.user;
   }, []);
 
@@ -93,29 +112,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const updatePreferences = useCallback(async (prefs: Partial<UserPreferences>) => {
-    const res = await fetch(`${API}/preferences`, {
+    const data = await apiJson<{ preferences: UserPreferences }>(`${API}/preferences`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify(prefs),
+      jsonBody: prefs,
+      defaultErrorMessage: 'Update failed',
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Update failed');
     setUser(prev => prev ? { ...prev, preferences: data.preferences } : null);
   }, []);
 
   const logout = useCallback(async () => {
     disconnectSocket();
-    await fetch(`${API}/logout`, {
+    await apiVoid(`${API}/logout`, {
       method: 'POST',
-      credentials: 'include',
+      defaultErrorMessage: 'Logout failed',
     });
     localStorage.removeItem('crab-current-project');
+    sessionActivatedRef.current = false;
     setUser(null);
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, requestCode, verifyCode, activateSession, updatePreferences, logout }}>
+    <AuthContext.Provider value={{ user, loading, requestCode, verifyCode, refreshSession, activateSession, updatePreferences, logout }}>
       {children}
     </AuthContext.Provider>
   );

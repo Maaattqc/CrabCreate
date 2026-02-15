@@ -1,28 +1,16 @@
 import type { ProjectSetupStatus, ConnectRepoPayload, CreateRepoPayload } from '../types';
+import { apiJson } from './http';
 
 const API = '/api';
 
-function getProjectId(): string {
-  return localStorage.getItem('crab-current-project') || '';
-}
-
-function projectHeaders(extra: Record<string, string> = {}): Record<string, string> {
-  const pid = getProjectId();
-  return pid ? { 'Content-Type': 'application/json', 'X-Project-Id': pid, ...extra } : { 'Content-Type': 'application/json', ...extra };
-}
-
 async function request<T>(url: string, options: RequestInit = {}): Promise<T> {
-  const res = await fetch(url, {
+  return apiJson<T>(url, {
     ...options,
-    headers: projectHeaders(options.headers as Record<string, string>),
-    credentials: 'include',
+    includeProjectId: true,
+    headers: { 'Content-Type': 'application/json', ...(options.headers as Record<string, string> || {}) },
+    sessionErrorMessage: 'Session expired',
+    defaultErrorMessage: 'Request failed',
   });
-  if (res.status === 401) throw new Error('Session expired');
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(err.error || 'Request failed');
-  }
-  return res.json();
 }
 
 export async function getSetupStatus(): Promise<ProjectSetupStatus> {

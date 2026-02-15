@@ -34,21 +34,29 @@ router.post('/bitbucket', webhookLimiter, (req: Request, res: Response) => {
   const envSecret = process.env.BITBUCKET_WEBHOOK_SECRET;
   const webhookSecret = (dbSecret || envSecret || '').trim();
   if (!webhookSecret || webhookSecret.length < 16) {
-    logger.error('[Webhook] Bitbucket webhook secret is not configured or too short (min 16 chars)');
+    logger.security('bitbucket_webhook_secret_missing_or_weak', { path: req.path });
     res.status(503).json({ error: 'Webhook secret not configured' });
     return;
   }
 
   const signature = (req.headers['x-hub-signature-256'] || req.headers['x-hub-signature']) as string | undefined;
   if (!signature || !signature.startsWith('sha256=')) {
-    logger.warn('[Webhook] Bitbucket request missing valid signature header');
+    logger.security('bitbucket_webhook_missing_signature', {
+      path: req.path,
+      event: req.headers['x-event-key'] || null,
+      ip: req.ip,
+    });
     res.status(401).json({ error: 'Missing signature' });
     return;
   }
 
   const rawBody = (req as Request & { rawBody?: Buffer }).rawBody;
   if (!rawBody) {
-    logger.warn('[Webhook] Missing raw body for signature verification');
+    logger.security('bitbucket_webhook_missing_raw_body', {
+      path: req.path,
+      event: req.headers['x-event-key'] || null,
+      ip: req.ip,
+    });
     res.status(400).json({ error: 'Invalid request body' });
     return;
   }
@@ -57,7 +65,11 @@ router.post('/bitbucket', webhookLimiter, (req: Request, res: Response) => {
   const sigBuffer = Buffer.from(signature, 'utf8');
   const expectedBuffer = Buffer.from(expected, 'utf8');
   if (sigBuffer.length !== expectedBuffer.length || !crypto.timingSafeEqual(sigBuffer, expectedBuffer)) {
-    logger.warn('[Webhook] Bitbucket signature mismatch');
+    logger.security('bitbucket_webhook_signature_mismatch', {
+      path: req.path,
+      event: req.headers['x-event-key'] || null,
+      ip: req.ip,
+    });
     res.status(401).json({ error: 'Invalid signature' });
     return;
   }
@@ -70,7 +82,11 @@ router.post('/bitbucket', webhookLimiter, (req: Request, res: Response) => {
   const replayNonce = buildReplayNonce(signature, event, rawBody, requestIdHeader);
   const isFreshRequest = repo.consumeWebhookNonce('bitbucket', replayNonce, WEBHOOK_REPLAY_TTL_SECONDS);
   if (!isFreshRequest) {
-    logger.warn(`[Webhook] Replay detected and ignored (event=${event || 'unknown'})`);
+    logger.security('bitbucket_webhook_replay_detected', {
+      event: event || 'unknown',
+      requestId: requestIdHeader || null,
+      ip: req.ip,
+    });
     res.status(200).json({ received: true, duplicate: true });
     return;
   }
