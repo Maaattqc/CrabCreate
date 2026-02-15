@@ -1,10 +1,21 @@
 import { Router, Request, Response } from 'express';
+import rateLimit from 'express-rate-limit';
 import * as repo from '../db/repositories';
 import { validate } from '../middleware/validate';
 import { updateSettingsSchema } from '../schemas';
 import { requireAdmin } from '../middleware/auth';
+import { createRateLimitStore } from '../middleware/rate-limit-store';
 
 const router = Router();
+
+const settingsWriteLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 10,
+  store: createRateLimitStore('settings_write'),
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'Too many settings changes. Try again later.' },
+});
 
 // All settings routes are admin-only
 router.use(requireAdmin);
@@ -207,8 +218,9 @@ router.get('/', (req: Request, res: Response) => {
 });
 
 // PUT /api/settings
-router.put('/', validate(updateSettingsSchema), (req: Request, res: Response) => {
+router.put('/', settingsWriteLimiter, validate(updateSettingsSchema), (req: Request, res: Response) => {
   const updates = req.body;
+  const changedKeys: string[] = [];
 
   for (const key of ALL_KEYS) {
     if (updates[key] === undefined) continue;
@@ -224,6 +236,12 @@ router.put('/', validate(updateSettingsSchema), (req: Request, res: Response) =>
       const val = Math.max(bounds.min, Math.min(bounds.max, parseInt(updates[key], 10)));
       repo.setConfig(key, String(val));
     }
+    changedKeys.push(key);
+  }
+
+  // Audit trail for admin settings changes
+  if (changedKeys.length > 0) {
+    repo.insertAuditLog(req.user!.userId, req.user!.email, 'settings_update', 'admin', 0, JSON.stringify(changedKeys));
   }
 
   res.json(readAllSettings());

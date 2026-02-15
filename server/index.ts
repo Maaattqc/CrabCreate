@@ -78,6 +78,8 @@ const server = http.createServer(app);
 initSocket(server);
 
 // Security headers via helmet
+// NOTE: styleSrc 'unsafe-inline' is required by Tailwind CSS 4 runtime styles.
+// This is acceptable since scriptSrc does NOT allow unsafe-inline.
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {

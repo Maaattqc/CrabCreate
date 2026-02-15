@@ -225,33 +225,33 @@ describe('requestCodeSchema', () => {
 // ── verifyCodeSchema ─────────────────────────────────────────────────────────
 
 describe('verifyCodeSchema', () => {
-  it('accepts valid 6-digit code', () => {
-    const result = verifyCodeSchema.safeParse({ email: 'user@example.com', code: '123456' });
+  it('accepts valid 8-digit code', () => {
+    const result = verifyCodeSchema.safeParse({ email: 'user@example.com', code: '12345678' });
     expect(result.success).toBe(true);
   });
 
-  it('rejects code shorter than 6 digits', () => {
-    const result = verifyCodeSchema.safeParse({ email: 'user@example.com', code: '12345' });
-    expect(result.success).toBe(false);
-  });
-
-  it('rejects code longer than 6 digits', () => {
+  it('rejects code shorter than 8 digits', () => {
     const result = verifyCodeSchema.safeParse({ email: 'user@example.com', code: '1234567' });
     expect(result.success).toBe(false);
   });
 
+  it('rejects code longer than 8 digits', () => {
+    const result = verifyCodeSchema.safeParse({ email: 'user@example.com', code: '123456789' });
+    expect(result.success).toBe(false);
+  });
+
   it('rejects non-numeric code', () => {
-    const result = verifyCodeSchema.safeParse({ email: 'user@example.com', code: 'abcdef' });
+    const result = verifyCodeSchema.safeParse({ email: 'user@example.com', code: 'abcdefgh' });
     expect(result.success).toBe(false);
   });
 
   it('rejects alphanumeric code', () => {
-    const result = verifyCodeSchema.safeParse({ email: 'user@example.com', code: '12ab56' });
+    const result = verifyCodeSchema.safeParse({ email: 'user@example.com', code: '12ab5678' });
     expect(result.success).toBe(false);
   });
 
   it('rejects invalid email in verify request', () => {
-    const result = verifyCodeSchema.safeParse({ email: 'bad-email', code: '123456' });
+    const result = verifyCodeSchema.safeParse({ email: 'bad-email', code: '12345678' });
     expect(result.success).toBe(false);
   });
 });

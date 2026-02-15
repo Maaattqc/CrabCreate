@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import { disconnectSocket, reconnectSocket } from './useSocket';
 
 export interface UserPreferences {
   lang?: 'fr' | 'en';
@@ -88,6 +89,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     sessionActivatedRef.current = true;
     setUser(u);
     setLoading(false);
+    reconnectSocket();
   }, []);
 
   const updatePreferences = useCallback(async (prefs: Partial<UserPreferences>) => {
@@ -103,6 +105,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
+    disconnectSocket();
     await fetch(`${API}/logout`, {
       method: 'POST',
       credentials: 'include',

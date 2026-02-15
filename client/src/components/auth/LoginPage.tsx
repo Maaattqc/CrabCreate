@@ -17,7 +17,7 @@ export default function LoginPage({ onClose }: LoginPageProps) {
   const { t } = useLanguage();
   const [step, setStep] = useState<Step>('email');
   const [email, setEmail] = useState('');
-  const [code, setCode] = useState(['', '', '', '', '', '']);
+  const [code, setCode] = useState(['', '', '', '', '', '', '', '']);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
@@ -59,14 +59,14 @@ export default function LoginPage({ onClose }: LoginPageProps) {
 
     // Handle paste of full code
     if (value.length > 1) {
-      const digits = value.slice(0, 6).split('');
+      const digits = value.slice(0, 8).split('');
       digits.forEach((d, i) => {
-        if (i < 6) newCode[i] = d;
+        if (i < 8) newCode[i] = d;
       });
       setCode(newCode);
-      const nextIndex = Math.min(digits.length, 5);
+      const nextIndex = Math.min(digits.length, 7);
       inputRefs.current[nextIndex]?.focus();
-      if (digits.length === 6) {
+      if (digits.length === 8) {
         submitCode(newCode.join(''));
       }
       return;
@@ -75,13 +75,13 @@ export default function LoginPage({ onClose }: LoginPageProps) {
     newCode[index] = value;
     setCode(newCode);
 
-    if (value && index < 5) {
+    if (value && index < 7) {
       inputRefs.current[index + 1]?.focus();
     }
 
-    // Auto-submit when all 6 digits are filled
+    // Auto-submit when all 8 digits are filled
     const full = newCode.join('');
-    if (full.length === 6 && newCode.every(d => d !== '')) {
+    if (full.length === 8 && newCode.every(d => d !== '')) {
       submitCode(full);
     }
   };
@@ -109,7 +109,7 @@ export default function LoginPage({ onClose }: LoginPageProps) {
       }, 1400);
     } catch (err) {
       setError((err as Error).message);
-      setCode(['', '', '', '', '', '']);
+      setCode(['', '', '', '', '', '', '', '']);
       setTimeout(() => inputRefs.current[0]?.focus(), 100);
     } finally {
       setLoading(false);
@@ -138,7 +138,7 @@ export default function LoginPage({ onClose }: LoginPageProps) {
 
   const handleBack = () => {
     setStep('email');
-    setCode(['', '', '', '', '', '']);
+    setCode(['', '', '', '', '', '', '', '']);
     setError('');
     setMessage('');
   };
@@ -266,20 +266,20 @@ export default function LoginPage({ onClose }: LoginPageProps) {
 
               {message && <p className="text-sm text-tx-faint mb-4">{message}</p>}
 
-              {/* 6-digit code input */}
-              <div className="flex gap-2.5 justify-center mb-4">
+              {/* 8-digit code input */}
+              <div className="flex gap-2 justify-center mb-4">
                 {code.map((digit, i) => (
                   <div key={i} className="relative">
                     <input
                       ref={el => { inputRefs.current[i] = el; }}
                       type="text"
                       inputMode="numeric"
-                      maxLength={6}
+                      maxLength={8}
                       value={digit}
                       onChange={e => handleCodeChange(i, e.target.value)}
                       onKeyDown={e => handleCodeKeyDown(i, e)}
                       disabled={loading}
-                      className={`w-12 h-14 bg-subtle border-2 rounded-xl text-center text-xl font-mono font-bold text-tx-primary
+                      className={`w-10 h-12 bg-subtle border-2 rounded-xl text-center text-lg font-mono font-bold text-tx-primary
                         focus:outline-none transition-all duration-200
                         ${digit
                           ? 'border-amber-500/60 shadow-[0_0_12px_rgba(245,158,11,0.15)] bg-amber-500/5'

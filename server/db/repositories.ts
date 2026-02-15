@@ -59,7 +59,7 @@ import type {
 
 // ── Tickets ──────────────────────────────────────────────────────────────────
 
-export function findAllTickets(filters: Record<string, string>, userId?: number, projectId?: number): Ticket[] {
+export function findAllTickets(filters: Record<string, string>, userId?: number, projectId?: number, limit = 500, offset = 0): Ticket[] {
   let sql = `SELECT t.*, uc.email AS creator_email, um.email AS modifier_email
     FROM kanban_tickets t
     LEFT JOIN auth_users uc ON t.user_id = uc.id
@@ -103,7 +103,9 @@ export function findAllTickets(filters: Record<string, string>, userId?: number,
     params.push(`%${escapeLike(filters.search)}%`, `%${escapeLike(filters.search)}%`);
   }
 
-  sql += ' ORDER BY t.position ASC, t.created_at DESC';
+  sql += ' ORDER BY t.position ASC, t.created_at DESC LIMIT ? OFFSET ?';
+  const safeLimit = Math.min(Math.max(1, limit), 500);
+  params.push(safeLimit, Math.max(0, offset));
   return db.prepare(sql).all(...params) as Ticket[];
 }
 

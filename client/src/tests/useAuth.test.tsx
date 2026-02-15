@@ -120,7 +120,7 @@ describe('useAuth', () => {
 
     let user: AuthUser | undefined;
     await act(async () => {
-      user = await result.current.verifyCode('test@example.com', '123456');
+      user = await result.current.verifyCode('test@example.com', '12345678');
     });
 
     expect(user).toEqual(mockUser);
@@ -129,7 +129,7 @@ describe('useAuth', () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ email: 'test@example.com', code: '123456' }),
+      body: JSON.stringify({ email: 'test@example.com', code: '12345678' }),
     });
   });
 

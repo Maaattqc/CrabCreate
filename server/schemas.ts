@@ -136,7 +136,7 @@ export const requestCodeSchema = z.object({
 
 export const verifyCodeSchema = z.object({
   email: z.string().email('Email invalide').max(255).transform(v => v.trim().toLowerCase()),
-  code: z.string().length(6, 'Le code doit contenir 6 chiffres').regex(/^\d{6}$/, 'Le code doit contenir 6 chiffres'),
+  code: z.string().length(8, 'Le code doit contenir 8 chiffres').regex(/^\d{8}$/, 'Le code doit contenir 8 chiffres'),
 });
 
 // ── Projects ─────────────────────────────────────────────────────────────────
@@ -187,7 +187,8 @@ export const updateCommentSchema = z.object({
 });
 
 export const toggleReactionSchema = z.object({
-  emoji: z.string().min(1).max(10),
+  emoji: z.string().min(1).max(10)
+    .refine(v => !/[\u200B-\u200F\u202A-\u202E\uFEFF\u2060-\u2064]/.test(v), 'Invalid emoji: contains control characters'),
 });
 
 // ── Subtasks ────────────────────────────────────────────────────────────────

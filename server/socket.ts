@@ -154,8 +154,8 @@ function initSocket(httpServer: http.Server): Server {
     }
   });
 
-  // Periodic re-validation: check token/user status every 5 minutes
-  const REVALIDATION_INTERVAL = 5 * 60 * 1000;
+  // Periodic re-validation: check token/user status every 60 seconds
+  const REVALIDATION_INTERVAL = 60 * 1000;
   setInterval(() => {
     if (!io) return;
     for (const [, socket] of io.sockets.sockets) {
@@ -367,11 +367,16 @@ function initSocket(httpServer: http.Server): Server {
       if (!userId) return;
       if (isThrottled(socket.id, 'user:status')) return;
       if (typeof data.status !== 'string' || !VALID_STATUSES.has(data.status)) return;
+
+      // Re-verify user is not blocked before broadcasting
+      const currentUser = repo.findUserById(userId);
+      if (!currentUser || currentUser.blocked === 1) return;
+
       userStatusMap.set(userId, { status: data.status, lastActive: Date.now() });
-      // Broadcast to all project rooms this user is in
-      if (userId) {
-        const projects = repo.findProjectsByUserId(userId);
-        for (const project of projects) {
+      // Broadcast only to projects where user is still a member
+      const projects = repo.findProjectsByUserId(userId);
+      for (const project of projects) {
+        if (repo.findProjectMember(project.id, userId)) {
           io!.to(`project:${project.id}`).emit('user:status', {
             userId,
             email,

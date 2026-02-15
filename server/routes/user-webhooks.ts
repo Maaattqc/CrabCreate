@@ -1,10 +1,21 @@
 import { Router, Request, Response } from 'express';
+import rateLimit from 'express-rate-limit';
 import * as repo from '../db/repositories';
 import { validate } from '../middleware/validate';
 import { createUserWebhookSchema, updateUserWebhookSchema } from '../schemas';
 import { hasMinRole } from '../permissions';
+import { createRateLimitStore } from '../middleware/rate-limit-store';
 
 const router = Router();
+
+const webhookCreateLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 20,
+  store: createRateLimitStore('webhook_create'),
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'Webhook creation rate limited. Try again later.' },
+});
 
 function sanitizeWebhook<T extends { secret: string | null }>(webhook: T): Omit<T, 'secret'> & { secret: null; secret_configured: boolean } {
   const { secret, ...rest } = webhook;
@@ -21,7 +32,7 @@ router.get('/', (req: Request, res: Response) => {
 });
 
 // POST /api/user-webhooks
-router.post('/', validate(createUserWebhookSchema), (req: Request, res: Response) => {
+router.post('/', webhookCreateLimiter, validate(createUserWebhookSchema), (req: Request, res: Response) => {
   if (!hasMinRole(req.project!.userRole, 'admin')) {
     return res.status(403).json({ error: 'Admin access required' });
   }

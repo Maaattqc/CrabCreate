@@ -12,7 +12,10 @@ import { checkPipelineLimit } from '../middleware/plan-limit';
 import { canLaunchPipeline, canModifyTicket } from '../permissions';
 import { isAllowedProjectRepoId } from '../security/project-repo';
 import logger from '../services/logger';
+import db from '../db/sqlite';
 import type { Ticket } from '../types';
+
+const PIPELINE_ACTIVE_STATUSES = new Set(['estimating', 'ai_coding', 'ai_review', 'testing', 'deploying']);
 
 const router = Router();
 
@@ -46,6 +49,17 @@ router.post('/launch/:id', checkPipelineLimit, pipelineGuard, async (req: Reques
       error: 'project_not_configured',
       message: 'Le projet doit être configuré avant de lancer la pipeline',
     });
+  }
+
+  // Atomic check: prevent double-launch by CAS on status
+  if (PIPELINE_ACTIVE_STATUSES.has(ticket.status)) {
+    return res.status(409).json({ error: 'Pipeline already running for this ticket' });
+  }
+  const statusCas = db.prepare(
+    "UPDATE kanban_tickets SET status = 'estimating', progress = 0 WHERE id = ? AND status NOT IN ('estimating','ai_coding','ai_review','testing','deploying')"
+  ).run(ticketId);
+  if (statusCas.changes === 0) {
+    return res.status(409).json({ error: 'Pipeline already running for this ticket' });
   }
 
   const projectId = req.project!.id;

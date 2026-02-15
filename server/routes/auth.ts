@@ -13,7 +13,7 @@ import logger from '../services/logger';
 import type { UserPreferences } from '../types';
 
 const router = Router();
-const MAX_AUTH_CODE_ATTEMPTS = 5;
+const MAX_AUTH_CODE_ATTEMPTS = 3;
 const DEV_LOGIN_ROUTE_ENVS = new Set(['development', 'test']);
 
 function normalizeIp(ip: string): string {
@@ -80,7 +80,7 @@ const verifyCodeLimiter = rateLimit({
 });
 
 function generateCode(): string {
-  return crypto.randomInt(100000, 1000000).toString();
+  return crypto.randomInt(10000000, 100000000).toString();
 }
 
 function getSessionDurationDays(): number {
@@ -88,13 +88,22 @@ function getSessionDurationDays(): number {
   return val ? parseInt(val, 10) : 30;
 }
 
-function setAuthCookie(res: Response, token: string): void {
-  const days = getSessionDurationDays();
+function getSessionDurationSeconds(): number {
+  return getSessionDurationDays() * 24 * 60 * 60;
+}
+
+function signToken(payload: JwtPayload): { token: string; maxAgeMs: number } {
+  const expiresInSec = getSessionDurationSeconds();
+  const token = jwt.sign(payload, config.jwtSecret, { algorithm: 'HS512', expiresIn: expiresInSec });
+  return { token, maxAgeMs: expiresInSec * 1000 };
+}
+
+function setAuthCookie(res: Response, token: string, maxAgeMs: number): void {
   res.cookie('crab_token', token, {
     httpOnly: true,
     secure: config.nodeEnv === 'production',
     sameSite: 'strict',
-    maxAge: days * 24 * 60 * 60 * 1000,
+    maxAge: maxAgeMs,
     path: '/',
   });
 }
@@ -206,9 +215,9 @@ router.post('/verify-code', verifyCodeLimiter, validate(verifyCodeSchema), (req:
   repo.clearTokenInvalidation(user.id);
 
   const payload: JwtPayload = { userId: user.id, email: user.email };
-  const token = jwt.sign(payload, config.jwtSecret, { algorithm: 'HS512', expiresIn: `${getSessionDurationDays()}d` });
+  const { token, maxAgeMs } = signToken(payload);
 
-  setAuthCookie(res, token);
+  setAuthCookie(res, token, maxAgeMs);
   repo.insertAuditLog(user.id, user.email, 'login', 'user', user.id, 'Email code verification', req.ip);
   res.json({ user: userResponse(user) });
 });
@@ -235,9 +244,9 @@ if (DEV_LOGIN_ROUTE_ENVS.has(config.nodeEnv)) {
     repo.clearTokenInvalidation(user.id);
 
     const payload: JwtPayload = { userId: user.id, email: user.email };
-    const token = jwt.sign(payload, config.jwtSecret, { algorithm: 'HS512', expiresIn: `${getSessionDurationDays()}d` });
+    const { token, maxAgeMs } = signToken(payload);
 
-    setAuthCookie(res, token);
+    setAuthCookie(res, token, maxAgeMs);
     repo.insertAuditLog(user.id, user.email, 'dev_login', 'user', user.id, 'Dev admin login', req.ip);
     res.json({ user: userResponse(user) });
   });
@@ -256,9 +265,9 @@ if (DEV_LOGIN_ROUTE_ENVS.has(config.nodeEnv)) {
     repo.clearTokenInvalidation(user.id);
 
     const payload: JwtPayload = { userId: user.id, email: user.email };
-    const token = jwt.sign(payload, config.jwtSecret, { algorithm: 'HS512', expiresIn: `${getSessionDurationDays()}d` });
+    const { token, maxAgeMs } = signToken(payload);
 
-    setAuthCookie(res, token);
+    setAuthCookie(res, token, maxAgeMs);
     repo.insertAuditLog(user.id, user.email, 'dev_login', 'user', user.id, 'Dev client login', req.ip);
     res.json({ user: userResponse(user) });
   });
@@ -275,9 +284,9 @@ if (DEV_LOGIN_ROUTE_ENVS.has(config.nodeEnv)) {
     repo.clearTokenInvalidation(user.id);
 
     const payload: JwtPayload = { userId: user.id, email: user.email };
-    const token = jwt.sign(payload, config.jwtSecret, { algorithm: 'HS512', expiresIn: `${getSessionDurationDays()}d` });
+    const { token, maxAgeMs } = signToken(payload);
 
-    setAuthCookie(res, token);
+    setAuthCookie(res, token, maxAgeMs);
     repo.insertAuditLog(user.id, user.email, 'dev_login', 'user', user.id, 'Dev new client login', req.ip);
     res.json({ user: userResponse(user) });
   });

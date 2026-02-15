@@ -5,9 +5,22 @@ const router = Router();
 
 // GET /api/notifications -- List notifications for current user
 router.get('/', (req: Request, res: Response) => {
-  const notifications = repo.findNotificationsByUserId(req.user!.userId);
-  const unread = repo.countUnreadNotifications(req.user!.userId);
-  res.json({ notifications, unread });
+  const userId = req.user!.userId;
+  const notifications = repo.findNotificationsByUserId(userId);
+
+  // Filter out notifications from projects the user is no longer a member of
+  const userProjects = repo.findProjectsByUserId(userId);
+  const projectIds = new Set(userProjects.map(p => p.id));
+  // Also allow global admin to see all notifications
+  const user = repo.findUserById(userId);
+  const isAdmin = user?.is_admin === 1;
+
+  const filtered = notifications.filter(n =>
+    !n.project_id || isAdmin || projectIds.has(n.project_id)
+  );
+  const unread = filtered.filter(n => n.read === 0).length;
+
+  res.json({ notifications: filtered, unread });
 });
 
 // POST /api/notifications/:id/read -- Mark one notification as read

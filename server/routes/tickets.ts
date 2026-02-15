@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { emitNotification, emitTicketUpdated } from '../socket';
 import * as repo from '../db/repositories';
+import db from '../db/sqlite';
 import { createTicketLimiter } from '../middleware/rate-limit';
 import { validate } from '../middleware/validate';
 import { checkTicketLimit } from '../middleware/plan-limit';
@@ -80,7 +81,9 @@ router.get('/', (req: Request, res: Response) => {
   if (stringParam(q.tag)) filters.tag = stringParam(q.tag)!;
   if (stringParam(q.search)) filters.search = stringParam(q.search)!;
   const projectId = req.project!.id;
-  const tickets = repo.findAllTickets(filters, undefined, projectId);
+  const limit = Math.min(Number(req.query.limit) || 500, 500);
+  const offset = Math.max(Number(req.query.offset) || 0, 0);
+  const tickets = repo.findAllTickets(filters, undefined, projectId, limit, offset);
   res.json(tickets);
 });
 
@@ -132,19 +135,32 @@ router.post('/', createTicketLimiter, checkTicketLimit, validate(createTicketSch
     return res.status(400).json({ error: 'Project repository is not configured' });
   }
 
-  const ticket = repo.createTicket({
-    title,
-    description,
-    priority,
-    template,
-    ai_model,
-    repo: resolvedRepoId,
-    assignee,
-    target_files,
-    tags,
-    depends_on: JSON.stringify(normalizedDependsOn),
-    due_date: due_date || null,
-  }, req.user!.userId, req.project!.id);
+  // Atomic create with plan-limit re-check to prevent race conditions
+  const ticketLimit = (req as Request & { _ticketLimit?: number })._ticketLimit;
+  const ticket = db.transaction(() => {
+    // Re-check limit inside transaction to prevent concurrent over-creation
+    if (ticketLimit !== undefined) {
+      const count = repo.countUserTicketsThisMonth(req.user!.userId, req.project!.id);
+      if (count >= ticketLimit) return null;
+    }
+    return repo.createTicket({
+      title,
+      description,
+      priority,
+      template,
+      ai_model,
+      repo: resolvedRepoId,
+      assignee,
+      target_files,
+      tags,
+      depends_on: JSON.stringify(normalizedDependsOn),
+      due_date: due_date || null,
+    }, req.user!.userId, req.project!.id);
+  })();
+
+  if (!ticket) {
+    return res.status(403).json({ error: 'plan_limit_tickets' });
+  }
 
   repo.insertActivity(ticket.id, `Ticket "${title}" créé`, 'create');
   repo.insertAuditLog(req.user!.userId, req.user!.email, 'ticket_create', 'ticket', ticket.id, title);

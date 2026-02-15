@@ -16,27 +16,28 @@ function checkAndLock(ticket: Ticket): FileCheckResult {
     return { ok: true };
   }
 
-  // Check for conflicts
-  for (const filePath of targetFiles) {
-    const lock = db.prepare(
-      'SELECT * FROM kanban_file_locks WHERE file_path = ? AND ticket_id != ?'
-    ).get(filePath, ticket.id) as FileLock | undefined;
+  // Wrap check + lock in a transaction to prevent TOCTOU race conditions
+  return db.transaction(() => {
+    for (const filePath of targetFiles) {
+      const lock = db.prepare(
+        'SELECT * FROM kanban_file_locks WHERE file_path = ? AND ticket_id != ?'
+      ).get(filePath, ticket.id) as FileLock | undefined;
 
-    if (lock) {
-      return {
-        ok: false,
-        message: `Fichier "${filePath}" bloqué par le ticket #${lock.ticket_id}`,
-      };
+      if (lock) {
+        return {
+          ok: false as const,
+          message: `Fichier "${filePath}" bloqué par le ticket #${lock.ticket_id}`,
+        };
+      }
     }
-  }
 
-  // Lock all files
-  const insert = db.prepare('INSERT OR IGNORE INTO kanban_file_locks (file_path, ticket_id) VALUES (?, ?)');
-  for (const filePath of targetFiles) {
-    insert.run(filePath, ticket.id);
-  }
+    const insert = db.prepare('INSERT OR IGNORE INTO kanban_file_locks (file_path, ticket_id) VALUES (?, ?)');
+    for (const filePath of targetFiles) {
+      insert.run(filePath, ticket.id);
+    }
 
-  return { ok: true };
+    return { ok: true as const };
+  })();
 }
 
 /**

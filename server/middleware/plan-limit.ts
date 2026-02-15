@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import * as repo from '../db/repositories';
+import db from '../db/sqlite';
 
 const PLAN_TICKET_KEYS: Record<string, string> = {
   free: 'plan_free_tickets',
@@ -45,12 +46,18 @@ export function checkTicketLimit(req: Request, res: Response, next: NextFunction
   // -1 means unlimited
   if (limit === -1) { next(); return; }
 
+  // Re-check inside a transaction to prevent race conditions on concurrent creates.
+  // The actual insert happens later in the route, but we store the validated limit
+  // on the request so the route can do a final atomic check.
   const projectId = req.project!.id;
   const count = repo.countUserTicketsThisMonth(userId, projectId);
   if (count >= limit) {
     res.status(403).json({ error: 'plan_limit_tickets' });
     return;
   }
+
+  // Store limit for atomic re-check at insert time
+  (req as Request & { _ticketLimit?: number })._ticketLimit = limit;
 
   next();
 }
