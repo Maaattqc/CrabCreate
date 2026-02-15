@@ -639,6 +639,9 @@ export interface Translations {
   historyAll: string;
   historyCompleted: string;
   historyActive: string;
+  listTitle: string;
+  listStatus: string;
+  listProgress: string;
   historyEmpty: string;
 
   // Export
@@ -1277,6 +1280,9 @@ export const translations: Record<Lang, Translations> = {
     historyAll: 'Tous',
     historyCompleted: 'Terminés',
     historyActive: 'En cours',
+    listTitle: 'Titre',
+    listStatus: 'Statut',
+    listProgress: 'Progression',
     historyEmpty: 'Aucun billet trouvé',
 
     exportCSV: 'Exporter CSV',
@@ -1907,6 +1913,9 @@ export const translations: Record<Lang, Translations> = {
     historyAll: 'All',
     historyCompleted: 'Completed',
     historyActive: 'Active',
+    listTitle: 'Title',
+    listStatus: 'Status',
+    listProgress: 'Progress',
     historyEmpty: 'No tickets found',
 
     exportCSV: 'Export CSV',

@@ -11,10 +11,27 @@ interface WebhooksPanelProps {
 const AVAILABLE_EVENTS = [
   'ticket:created',
   'ticket:updated',
+  'ticket:deleted',
   'ticket:status_changed',
   'pipeline:completed',
   'comment:added',
 ] as const;
+
+function parseWebhookEvents(raw: string | string[] | null | undefined): string[] {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw;
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed) && parsed.every((v) => typeof v === 'string')) {
+      return parsed;
+    }
+  } catch {
+    // Fallback for legacy comma-separated payloads.
+  }
+
+  return raw.split(',').map((event) => event.trim()).filter(Boolean);
+}
 
 export default function WebhooksPanel({ projectId }: WebhooksPanelProps) {
   const { t } = useLanguage();
@@ -89,7 +106,7 @@ export default function WebhooksPanel({ projectId }: WebhooksPanelProps) {
   function startEdit(webhook: UserWebhook) {
     setEditingId(webhook.id);
     setEditUrl(webhook.url);
-    setEditEvents(webhook.events ? webhook.events.split(',') : []);
+    setEditEvents(parseWebhookEvents(webhook.events));
     setEditSecret(webhook.secret || '');
   }
 
@@ -99,7 +116,7 @@ export default function WebhooksPanel({ projectId }: WebhooksPanelProps) {
     try {
       const updated = await webhooksApi.updateWebhook(editingId, {
         url: editUrl.trim(),
-        events: editEvents.join(','),
+        events: editEvents,
         secret: editSecret.trim() || null,
       });
       setWebhooks(prev => prev.map(w => w.id === editingId ? updated : w));
@@ -231,7 +248,7 @@ export default function WebhooksPanel({ projectId }: WebhooksPanelProps) {
       ) : (
         <div className="space-y-2">
           {webhooks.map(webhook => {
-            const events = webhook.events ? webhook.events.split(',') : [];
+            const events = parseWebhookEvents(webhook.events);
             const isEditing = editingId === webhook.id;
 
             if (isEditing) {

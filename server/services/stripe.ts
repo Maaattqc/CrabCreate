@@ -72,7 +72,7 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
       const subscriptionId = session.subscription as string;
       const user = repo.findUserByStripeCustomerId(customerId);
       if (!user) {
-        logger.error(`[Stripe] checkout.session.completed: no user for customer ${customerId}`);
+        logger.error(`[Stripe] checkout.session.completed: no user for customer ${customerId.slice(0, 8)}...`);
         break;
       }
 
@@ -88,7 +88,7 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
       const customerId = subscription.customer as string;
       const user = repo.findUserByStripeCustomerId(customerId);
       if (!user) {
-        logger.error(`[Stripe] subscription.updated: no user for customer ${customerId}`);
+        logger.error(`[Stripe] subscription.updated: no user for customer ${customerId.slice(0, 8)}...`);
         break;
       }
 
@@ -110,7 +110,7 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
       const customerId = subscription.customer as string;
       const user = repo.findUserByStripeCustomerId(customerId);
       if (!user) {
-        logger.error(`[Stripe] subscription.deleted: no user for customer ${customerId}`);
+        logger.error(`[Stripe] subscription.deleted: no user for customer ${customerId.slice(0, 8)}...`);
         break;
       }
 

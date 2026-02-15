@@ -5,13 +5,13 @@ export const createTicketSchema = z.object({
   description: z.string().max(5000, 'Description trop longue').optional().default(''),
   ai_model: z.enum(['claude', 'gpt']).optional().default('claude'),
   priority: z.enum(['low', 'medium', 'high', 'critical']).optional().default('medium'),
-  template: z.string().optional().default('feature'),
-  repo: z.string().optional().default('main-site'),
-  assignee: z.string().optional().default('unassigned'),
-  target_files: z.array(z.string()).optional().default([]),
-  tags: z.array(z.string()).optional().default([]),
-  depends_on: z.array(z.number()).optional().default([]),
-  due_date: z.string().optional(),
+  template: z.string().max(100).optional().default('feature'),
+  repo: z.string().min(1).max(120).optional().default('main-site'),
+  assignee: z.string().max(120).optional().default('unassigned'),
+  target_files: z.array(z.string().min(1).max(260)).max(200).optional().default([]),
+  tags: z.array(z.string().min(1).max(50)).max(50).optional().default([]),
+  depends_on: z.array(z.number().int().positive()).max(100).optional().default([]),
+  due_date: z.string().max(40).optional(),
 });
 
 export const updateTicketSchema = z.object({
@@ -19,14 +19,14 @@ export const updateTicketSchema = z.object({
   description: z.string().max(5000).optional(),
   priority: z.enum(['low', 'medium', 'high', 'critical']).optional(),
   status: z.enum(['backlog', 'todo', 'in_progress', 'estimating', 'ai_coding', 'ai_review', 'review', 'testing', 'deploying', 'done', 'cancelled']).optional(),
-  template: z.string().optional(),
+  template: z.string().max(100).optional(),
   ai_model: z.enum(['claude', 'gpt']).optional(),
-  repo: z.string().optional(),
-  assignee: z.string().optional(),
-  target_files: z.union([z.string(), z.array(z.string())]).optional(),
-  tags: z.union([z.string(), z.array(z.string())]).optional(),
-  depends_on: z.union([z.string(), z.array(z.number())]).optional(),
-  due_date: z.string().nullable().optional(),
+  repo: z.string().min(1).max(120).optional(),
+  assignee: z.string().max(120).optional(),
+  target_files: z.union([z.string().max(50000), z.array(z.string().min(1).max(260)).max(200)]).optional(),
+  tags: z.union([z.string().max(5000), z.array(z.string().min(1).max(50)).max(50)]).optional(),
+  depends_on: z.union([z.string().max(5000), z.array(z.number().int().positive()).max(100)]).optional(),
+  due_date: z.string().max(40).nullable().optional(),
 }).refine(data => Object.keys(data).length > 0, { message: 'At least one field required' });
 
 export const sendChatSchema = z.object({
@@ -85,6 +85,9 @@ export const updateSettingsSchema = z.object({
   auth_verify_window_minutes: z.number().int().min(5).max(60).optional(),
   contact_limit: z.number().int().min(1).max(10).optional(),
   contact_window_minutes: z.number().int().min(15).max(1440).optional(),
+  chat_messages_per_minute: z.number().int().min(1).max(120).optional(),
+  export_requests_per_hour: z.number().int().min(1).max(200).optional(),
+  max_user_webhooks_per_project: z.number().int().min(1).max(100).optional(),
   // Git & Deploy
   git_default_branch: z.string().min(1).max(100).optional(),
   git_merge_strategy: z.enum(['merge_commit', 'squash', 'fast_forward']).optional(),
@@ -128,11 +131,11 @@ export const preferencesSchema = z.object({
 });
 
 export const requestCodeSchema = z.object({
-  email: z.string().email('Email invalide').max(255),
+  email: z.string().email('Email invalide').max(255).transform(v => v.trim().toLowerCase()),
 });
 
 export const verifyCodeSchema = z.object({
-  email: z.string().email('Email invalide').max(255),
+  email: z.string().email('Email invalide').max(255).transform(v => v.trim().toLowerCase()),
   code: z.string().length(6, 'Le code doit contenir 6 chiffres').regex(/^\d{6}$/, 'Le code doit contenir 6 chiffres'),
 });
 
@@ -233,15 +236,36 @@ export const updateTicketTemplateSchema = z.object({
 
 // ── User Webhooks ───────────────────────────────────────────────────────────
 
+const WEBHOOK_EVENT_SCHEMA = z.enum([
+  'ticket:created',
+  'ticket:updated',
+  'ticket:deleted',
+  'ticket:status_changed',
+  'pipeline:completed',
+  'comment:added',
+]);
+
 export const createUserWebhookSchema = z.object({
-  url: z.string().url('URL invalide').max(500, 'URL trop longue'),
-  events: z.array(z.string()).min(1, 'Au moins un événement requis'),
+  url: z.string().url('URL invalide').max(500, 'URL trop longue').refine((value) => {
+    try {
+      return new URL(value).protocol === 'https:';
+    } catch {
+      return false;
+    }
+  }, 'URL webhook doit utiliser HTTPS'),
+  events: z.array(WEBHOOK_EVENT_SCHEMA).min(1, 'Au moins un evenement requis').max(10),
   secret: z.string().max(200).optional(),
 });
 
 export const updateUserWebhookSchema = z.object({
-  url: z.string().url().max(500).optional(),
-  events: z.array(z.string()).optional(),
+  url: z.string().url().max(500).refine((value) => {
+    try {
+      return new URL(value).protocol === 'https:';
+    } catch {
+      return false;
+    }
+  }, 'URL webhook doit utiliser HTTPS').optional(),
+  events: z.array(WEBHOOK_EVENT_SCHEMA).max(10).optional(),
   enabled: z.number().int().min(0).max(1).optional(),
   secret: z.string().max(200).nullable().optional(),
 }).refine(data => Object.keys(data).length > 0, { message: 'At least one field required' });
@@ -267,3 +291,4 @@ export const configureDeploySchema = z.object({
   cfApiToken: z.string().min(1, 'Cloudflare API Token requis').max(500),
   cfAccountId: z.string().min(1, 'Account ID requis').max(100),
 });
+

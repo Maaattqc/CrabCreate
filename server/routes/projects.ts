@@ -1,11 +1,11 @@
 import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
-import db from '../db/sqlite';
 import * as repo from '../db/repositories';
 import { validate } from '../middleware/validate';
 import { requireProject, requireProjectRole } from '../middleware/project';
 import { checkProjectLimit, checkMemberLimit } from '../middleware/plan-limit';
 import { hasMinRole } from '../permissions';
+import { isAllowedProjectRepoId } from '../security/project-repo';
 import {
   createProjectSchema,
   updateProjectSchema,
@@ -28,8 +28,18 @@ router.get('/', (req: Request, res: Response) => {
 
 // POST /api/projects — create a project
 router.post('/', validate(createProjectSchema), checkProjectLimit, (req: Request, res: Response) => {
-  const { name, description, slug, is_private, default_repo } = req.body;
+  const { name, description, slug, is_private } = req.body;
   const userId = req.user!.userId;
+
+  // Security: new projects always start with the shared safe default repo.
+  // Project-specific repos are attached only via the setup flow (proj-{projectId}).
+  const requestedDefaultRepo = typeof req.body.default_repo === 'string'
+    ? req.body.default_repo.trim()
+    : 'main-site';
+  if (requestedDefaultRepo && requestedDefaultRepo !== 'main-site') {
+    res.status(400).json({ error: 'Invalid default_repo: use project setup to connect a repository' });
+    return;
+  }
 
   // Check slug uniqueness for this user
   const existing = repo.findProjectByOwnerAndSlug(userId, slug);
@@ -38,7 +48,7 @@ router.post('/', validate(createProjectSchema), checkProjectLimit, (req: Request
     return;
   }
 
-  const project = repo.createProject(name, description, slug, userId, is_private, default_repo);
+  const project = repo.createProject(name, description, slug, userId, is_private, 'main-site');
   repo.insertAuditLog(userId, req.user!.email, 'project_create', 'project', project.id, name);
   res.status(201).json({ ...project, role: 'owner' as ProjectRole });
 });
@@ -52,6 +62,23 @@ router.get('/:id', requireProject, (req: Request, res: Response) => {
 
 // PUT /api/projects/:id — update project (admin+)
 router.put('/:id', requireProject, requireProjectRole('admin'), validate(updateProjectSchema), (req: Request, res: Response) => {
+  if (req.body.default_repo !== undefined) {
+    const nextRepoId = typeof req.body.default_repo === 'string' ? req.body.default_repo.trim() : '';
+    if (!nextRepoId) {
+      res.status(400).json({ error: 'Invalid default_repo' });
+      return;
+    }
+    if (!isAllowedProjectRepoId(req.project!.id, nextRepoId)) {
+      res.status(400).json({ error: 'Invalid default_repo: repository must belong to this project' });
+      return;
+    }
+    if (!repo.findRepoById(nextRepoId)) {
+      res.status(400).json({ error: 'Project repository is not configured' });
+      return;
+    }
+    req.body.default_repo = nextRepoId;
+  }
+
   const updated = repo.updateProject(req.project!.id, req.body);
   if (!updated) { res.status(400).json({ error: 'No fields to update' }); return; }
   repo.insertAuditLog(req.user!.userId, req.user!.email, 'project_update', 'project', req.project!.id, JSON.stringify(req.body));
@@ -184,6 +211,8 @@ router.delete('/:id/members/:userId', requireProject, requireProjectRole('admin'
     return;
   }
 
+  // Cleanup user-scoped artifacts that should not survive membership removal.
+  repo.deleteFavoritesForUserInProject(targetUserId, projectId);
   repo.deleteProjectMember(projectId, targetUserId);
   repo.insertAuditLog(req.user!.userId, req.user!.email, 'project_member_remove', 'project', projectId, `user ${targetUserId}`);
   res.json({ success: true });
@@ -211,7 +240,7 @@ router.post('/:id/transfer-ownership', requireProject, requireProjectRole('owner
   repo.updateProjectMemberRole(projectId, currentOwnerId, 'admin');
   // Update project owner_id
   // Update owner_id
-  db.prepare("UPDATE kanban_projects SET owner_id = ?, updated_at = datetime('now') WHERE id = ?").run(new_owner_id, projectId);
+  repo.updateProjectOwner(projectId, new_owner_id);
 
   repo.insertAuditLog(currentOwnerId, req.user!.email, 'project_transfer', 'project', projectId, `→ user ${new_owner_id}`);
   res.json({ success: true });

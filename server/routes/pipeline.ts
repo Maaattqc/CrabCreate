@@ -10,9 +10,21 @@ import * as deployer from '../services/deployer';
 import { pipelineGuard } from '../middleware/pipeline-guard';
 import { checkPipelineLimit } from '../middleware/plan-limit';
 import { canLaunchPipeline, canModifyTicket } from '../permissions';
+import { isAllowedProjectRepoId } from '../security/project-repo';
 import logger from '../services/logger';
+import type { Ticket } from '../types';
 
 const router = Router();
+
+function isTicketRepoValidForProject(ticket: Ticket, projectId: number): boolean {
+  const project = repo.findProjectById(projectId);
+  if (!project || !project.default_repo) return false;
+  const projectRepoId = String(project.default_repo).trim();
+  if (!projectRepoId) return false;
+  if (!isAllowedProjectRepoId(projectId, projectRepoId)) return false;
+  const ticketRepoId = (ticket.repo || projectRepoId).trim();
+  return ticketRepoId === projectRepoId;
+}
 
 // POST /api/pipeline/launch/:id -- Launch full AI pipeline
 router.post('/launch/:id', checkPipelineLimit, pipelineGuard, async (req: Request, res: Response) => {
@@ -22,6 +34,9 @@ router.post('/launch/:id', checkPipelineLimit, pipelineGuard, async (req: Reques
   if (ticket.project_id !== req.project!.id) return res.status(403).json({ error: 'Access denied' });
   if (!canLaunchPipeline(ticket, req.user!.userId, req.project!.userRole)) {
     return res.status(403).json({ error: 'Access denied' });
+  }
+  if (!isTicketRepoValidForProject(ticket, req.project!.id)) {
+    return res.status(403).json({ error: 'Ticket repository mismatch' });
   }
 
   // Guard: project must be configured before launching pipeline
@@ -206,6 +221,9 @@ router.post('/approve/:id', async (req: Request, res: Response) => {
   if (!canModifyTicket(ticket, req.user!.userId, req.project!.userRole)) {
     return res.status(403).json({ error: 'Access denied' });
   }
+  if (!isTicketRepoValidForProject(ticket, req.project!.id)) {
+    return res.status(403).json({ error: 'Ticket repository mismatch' });
+  }
 
   const projectId = req.project!.id;
 
@@ -235,6 +253,9 @@ router.post('/reject/:id', async (req: Request, res: Response) => {
   if (ticket.project_id !== req.project!.id) return res.status(403).json({ error: 'Access denied' });
   if (!canModifyTicket(ticket, req.user!.userId, req.project!.userRole)) {
     return res.status(403).json({ error: 'Access denied' });
+  }
+  if (!isTicketRepoValidForProject(ticket, req.project!.id)) {
+    return res.status(403).json({ error: 'Ticket repository mismatch' });
   }
 
   const projectId = req.project!.id;
@@ -266,6 +287,9 @@ router.post('/retry/:id', (req: Request, res: Response) => {
   if (!canModifyTicket(ticket, req.user!.userId, req.project!.userRole)) {
     return res.status(403).json({ error: 'Access denied' });
   }
+  if (!isTicketRepoValidForProject(ticket, req.project!.id)) {
+    return res.status(403).json({ error: 'Ticket repository mismatch' });
+  }
 
   const projectId = req.project!.id;
 
@@ -287,6 +311,9 @@ router.post('/rollback/:id', async (req: Request, res: Response) => {
   if (ticket.project_id !== req.project!.id) return res.status(403).json({ error: 'Access denied' });
   if (!canModifyTicket(ticket, req.user!.userId, req.project!.userRole)) {
     return res.status(403).json({ error: 'Access denied' });
+  }
+  if (!isTicketRepoValidForProject(ticket, req.project!.id)) {
+    return res.status(403).json({ error: 'Ticket repository mismatch' });
   }
 
   const projectId = req.project!.id;

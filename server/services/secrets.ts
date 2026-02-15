@@ -72,10 +72,7 @@ export function isHashedAuthCode(value: string | null | undefined): boolean {
 export function authCodeMatches(storedCode: string, candidate: string): boolean {
   if (!storedCode || !candidate) return false;
 
-  if (isHashedAuthCode(storedCode)) {
-    return timingSafeStringEquals(storedCode, hashAuthCode(candidate));
-  }
-
-  // Backward compatibility: old plaintext codes still verify.
-  return timingSafeStringEquals(storedCode, candidate);
+  // Only accept hashed codes — plaintext fallback removed for security
+  if (!isHashedAuthCode(storedCode)) return false;
+  return timingSafeStringEquals(storedCode, hashAuthCode(candidate));
 }

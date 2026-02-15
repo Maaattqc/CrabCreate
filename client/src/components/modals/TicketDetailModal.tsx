@@ -288,7 +288,7 @@ export default function TicketDetailModal({ ticket, initialTab, onClose, onAppro
                 ticket.ai_review_score >= 50 ? 'bg-amber-500/10 text-amber-400' :
                 'bg-red-500/10 text-red-400'
               }`}>
-                Score {ticket.ai_review_score}/100
+                {t.score} {ticket.ai_review_score}/100
               </span>
             )}
             {ticket.cost_usd > 0 && (

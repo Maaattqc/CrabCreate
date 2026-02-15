@@ -105,7 +105,7 @@ describe('requireAuth middleware', () => {
 
     expect(repo.findUserById).toHaveBeenCalledWith(1);
     expect(res.status).toHaveBeenCalledWith(401);
-    expect(res.json).toHaveBeenCalledWith({ error: 'User not found' });
+    expect(res.json).toHaveBeenCalledWith({ error: 'Invalid or expired token' });
     expect(next).not.toHaveBeenCalled();
   });
 

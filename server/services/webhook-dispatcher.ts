@@ -52,27 +52,28 @@ function isLocalHostname(hostname: string): boolean {
   return lower === 'localhost' || lower === '0.0.0.0' || lower === '[::1]' || lower.endsWith('.local');
 }
 
-/** Validate that a webhook URL is not targeting internal/private resources */
-async function isUrlSafe(urlStr: string): Promise<boolean> {
+/** Validate that a webhook URL is not targeting internal/private resources.
+ *  Returns the first safe resolved IP, or null if blocked. */
+async function resolveAndValidateUrl(urlStr: string): Promise<{ ip: string; parsed: URL } | null> {
   try {
     const parsed = new URL(urlStr);
-    // Block non-http(s) schemes
-    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return false;
+    // Only allow HTTPS to avoid plaintext webhook delivery
+    if (parsed.protocol !== 'https:') return null;
     // Block localhost hostnames
     const hostname = parsed.hostname;
-    if (!hostname || isLocalHostname(hostname)) return false;
+    if (!hostname || isLocalHostname(hostname)) return null;
 
     // Block direct private IP targets
-    if (net.isIP(hostname) && isPrivateIp(hostname)) return false;
+    if (net.isIP(hostname) && isPrivateIp(hostname)) return null;
 
     // Resolve DNS and reject if any resolved address is private/internal
     const resolved = await dnsPromises.lookup(hostname, { all: true, verbatim: true });
-    if (!resolved.length) return false;
-    if (resolved.some(r => isPrivateIp(r.address))) return false;
+    if (!resolved.length) return null;
+    if (resolved.some(r => isPrivateIp(r.address))) return null;
 
-    return true;
+    return { ip: resolved[0].address, parsed };
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -82,18 +83,23 @@ export async function dispatchWebhooks(projectId: number, event: string, payload
 
   for (const webhook of webhooks) {
     try {
-      // SSRF protection: validate webhook URL does not target internal resources
-      const safe = await isUrlSafe(webhook.url);
-      if (!safe) {
+      // SSRF protection: resolve DNS once and validate before fetch
+      const resolved = await resolveAndValidateUrl(webhook.url);
+      if (!resolved) {
         logger.warn(`Webhook ${webhook.id} blocked — URL targets internal/private address: ${webhook.url}`);
         continue;
       }
 
       const body = JSON.stringify({ event, timestamp: new Date().toISOString(), data: payload });
 
+      // Build URL with resolved IP to prevent DNS rebinding
+      const fetchUrl = new URL(resolved.parsed.toString());
+      fetchUrl.hostname = resolved.ip;
+
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
         'X-Webhook-Event': event,
+        'Host': resolved.parsed.host,
       };
 
       // HMAC-SHA256 signature if secret is set
@@ -106,7 +112,7 @@ export async function dispatchWebhooks(projectId: number, event: string, payload
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 5000);
 
-      const res = await fetch(webhook.url, {
+      const res = await fetch(fetchUrl.toString(), {
         method: 'POST',
         headers,
         body,

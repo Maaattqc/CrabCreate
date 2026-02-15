@@ -3,6 +3,7 @@ import type { Ticket, DependencyCheckResult } from '../types';
 
 /**
  * Check that all tickets this ticket depends on are approved.
+ * Dependencies must stay inside the same project to avoid cross-project leakage.
  */
 function check(ticket: Ticket): DependencyCheckResult {
   let dependsOn: number[] = [];
@@ -17,10 +18,21 @@ function check(ticket: Ticket): DependencyCheckResult {
   }
 
   for (const depId of dependsOn) {
-    const dep = db.prepare('SELECT id, status, title FROM kanban_tickets WHERE id = ?').get(depId) as { id: number; status: string; title: string } | undefined;
+    const dep = db.prepare('SELECT id, status, title, project_id FROM kanban_tickets WHERE id = ?').get(depId) as {
+      id: number;
+      status: string;
+      title: string;
+      project_id: number | null;
+    } | undefined;
+
     if (!dep) {
-      return { ok: false, message: `Dépendance #${depId} introuvable` };
+      return { ok: false, message: `Dependance #${depId} introuvable` };
     }
+
+    if (dep.project_id !== ticket.project_id) {
+      return { ok: false, message: `Dependance #${depId} invalide pour ce projet` };
+    }
+
     if (dep.status !== 'approved') {
       return {
         ok: false,

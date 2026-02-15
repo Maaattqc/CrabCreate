@@ -41,11 +41,21 @@ import { apiLimiter } from './middleware/rate-limit';
 import { requireAuth } from './middleware/auth';
 import { requireProject } from './middleware/project';
 import { maintenanceGuard } from './middleware/maintenance';
+import { csrfGuard } from './middleware/csrf';
+import { isAllowedProjectRepoId } from './security/project-repo';
 
 // Validate JWT secret in production
 if (config.nodeEnv === 'production' && (!config.jwtSecret || config.jwtSecret === 'dev-secret-change-me-in-production' || config.jwtSecret.length < 64)) {
   logger.error('JWT_SECRET must be set to a strong secret (64+ chars) in production. Exiting.');
   process.exit(1);
+}
+
+// Validate Stripe configuration: both keys must be set together
+if (config.stripeSecretKey && !config.stripeWebhookSecret) {
+  logger.warn('STRIPE_SECRET_KEY is set but STRIPE_WEBHOOK_SECRET is missing. Stripe webhooks will not work.');
+}
+if (!config.stripeSecretKey && config.stripeWebhookSecret) {
+  logger.warn('STRIPE_WEBHOOK_SECRET is set but STRIPE_SECRET_KEY is missing. Billing will not work.');
 }
 
 // Run migrations
@@ -73,10 +83,16 @@ app.use(helmet({
       connectSrc: ["'self'", `ws://${new URL(config.clientUrl).host}`, `wss://${new URL(config.clientUrl).host}`],
     },
   },
-  hsts: config.nodeEnv === 'production' ? { maxAge: 31536000, includeSubDomains: true } : false,
+  hsts: config.nodeEnv === 'production' ? { maxAge: 31536000, includeSubDomains: true, preload: true } : false,
   frameguard: { action: 'deny' },
   referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
 }));
+
+// Permissions-Policy header — restrict browser features
+app.use((_req: Request, res: Response, next: NextFunction) => {
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=(self)');
+  next();
+});
 
 // Middleware
 app.use(cors({ origin: config.clientUrl, credentials: true }));
@@ -120,6 +136,7 @@ app.use(cookieParser());
 
 // Rate limiting
 app.use('/api', apiLimiter);
+app.use('/api', csrfGuard);
 
 // Health check (no auth, no rate limit)
 app.get('/health', (_req: Request, res: Response) => {
@@ -212,6 +229,12 @@ app.get('/api/repos', requireProject, (req: Request, res: Response) => {
   const project = repo.findProjectById(req.project!.id);
   if (!project) {
     res.status(404).json({ error: 'Project not found' });
+    return;
+  }
+
+  if (!project.default_repo || !isAllowedProjectRepoId(req.project!.id, String(project.default_repo))) {
+    logger.warn(`[Security] Project ${req.project!.id} has unauthorized default_repo: ${String(project.default_repo)}`);
+    res.json([]);
     return;
   }
 

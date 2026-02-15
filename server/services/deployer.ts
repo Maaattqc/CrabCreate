@@ -3,6 +3,7 @@ import * as repoReader from './repo-reader';
 import * as repoDb from '../db/repositories';
 import { createGitProvider } from './git-providers';
 import { emitTicketLog } from '../socket';
+import { isAllowedProjectRepoId } from '../security/project-repo';
 import type { Ticket, CodingResult, DeployResult, Repo } from '../types';
 
 /**
@@ -28,11 +29,34 @@ function getProvider(repo: Repo) {
   );
 }
 
+function resolveAuthorizedRepo(ticket: Ticket): Repo | null {
+  if (!ticket.project_id) {
+    throw new Error(`Ticket "${ticket.id}" has no project context`);
+  }
+
+  const project = repoDb.findProjectById(ticket.project_id);
+  if (!project || !project.default_repo) {
+    throw new Error(`Project "${ticket.project_id}" has no default repo configured`);
+  }
+
+  const projectRepoId = String(project.default_repo).trim();
+  if (!isAllowedProjectRepoId(ticket.project_id, projectRepoId)) {
+    throw new Error(`Security policy blocked unauthorized repo id for project ${ticket.project_id}`);
+  }
+
+  const ticketRepoId = String(ticket.repo || projectRepoId).trim();
+  if (ticketRepoId !== projectRepoId) {
+    throw new Error(`Security policy blocked repo mismatch for project ${ticket.project_id}`);
+  }
+
+  return repoDb.findRepoById(projectRepoId) || null;
+}
+
 /**
  * Deploy to staging: commit, push, create PR.
  */
 async function deployToStaging(ticket: Ticket, codingResult: CodingResult): Promise<DeployResult> {
-  const repo = repoDb.findRepoById(ticket.repo || 'main-site');
+  const repo = resolveAuthorizedRepo(ticket);
 
   if (!repo || !isRepoConfigured(repo)) {
     // Simulation mode — no Git configured
@@ -76,7 +100,7 @@ async function deployToStaging(ticket: Ticket, codingResult: CodingResult): Prom
  * Merge PR to production (approve flow).
  */
 async function mergeToProduction(ticket: Ticket): Promise<void> {
-  const repo = repoDb.findRepoById(ticket.repo || 'main-site');
+  const repo = resolveAuthorizedRepo(ticket);
 
   if (!repo || !isRepoConfigured(repo) || !ticket.pr_id) {
     emitTicketLog(ticket.id, 'Mode simulation: merge simulé', 'info', 'deploying');
@@ -93,7 +117,7 @@ async function mergeToProduction(ticket: Ticket): Promise<void> {
  * Close/decline PR (reject flow).
  */
 async function closePR(ticket: Ticket): Promise<void> {
-  const repo = repoDb.findRepoById(ticket.repo || 'main-site');
+  const repo = resolveAuthorizedRepo(ticket);
 
   if (!repo || !isRepoConfigured(repo) || !ticket.pr_id) {
     return;

@@ -4,6 +4,7 @@ import fs from 'fs';
 import config from '../config';
 import * as repoDb from '../db/repositories';
 import { buildCloneUrl } from './git-providers';
+import { isAllowedProjectRepoId } from '../security/project-repo';
 import type { Ticket, Repo } from '../types';
 
 /**
@@ -11,8 +12,30 @@ import type { Ticket, Repo } from '../types';
  * Returns the local path to the cloned repo.
  */
 async function cloneOrPull(ticket: Ticket): Promise<{ repoDir: string; repo: Repo }> {
-  const repo = repoDb.findRepoById(ticket.repo || 'main-site');
-  if (!repo) throw new Error(`Repo "${ticket.repo}" not found in kanban_repos`);
+  if (!ticket.project_id) {
+    throw new Error(`Ticket "${ticket.id}" has no project context`);
+  }
+
+  const project = repoDb.findProjectById(ticket.project_id);
+  if (!project) {
+    throw new Error(`Project "${ticket.project_id}" not found`);
+  }
+  if (!project.default_repo) {
+    throw new Error(`Project "${ticket.project_id}" has no default repo configured`);
+  }
+
+  const projectRepoId = String(project.default_repo).trim();
+  if (!isAllowedProjectRepoId(ticket.project_id, projectRepoId)) {
+    throw new Error(`Security policy blocked unauthorized repo id for project ${ticket.project_id}`);
+  }
+
+  const ticketRepoId = String(ticket.repo || projectRepoId).trim();
+  if (ticketRepoId !== projectRepoId) {
+    throw new Error(`Security policy blocked repo mismatch for project ${ticket.project_id}`);
+  }
+
+  const repo = repoDb.findRepoById(projectRepoId);
+  if (!repo) throw new Error(`Repo "${projectRepoId}" not found in kanban_repos`);
 
   const repoDir = path.join(config.reposClonePath, `ticket-${ticket.id}`);
 

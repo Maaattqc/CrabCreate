@@ -301,7 +301,7 @@ export interface UserWebhook {
   id: number;
   project_id: number;
   url: string;
-  events: string;
+  events: string | string[];
   secret: string | null;
   enabled: number;
   created_at: string;

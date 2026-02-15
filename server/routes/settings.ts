@@ -35,6 +35,9 @@ const NUMERIC_KEYS = [
   'auth_verify_window_minutes',
   'contact_limit',
   'contact_window_minutes',
+  'chat_messages_per_minute',
+  'export_requests_per_hour',
+  'max_user_webhooks_per_project',
   // Git & Deploy
   'branch_name_max_length',
   // Queue & Pipeline
@@ -109,6 +112,9 @@ const DEFAULTS: Record<string, number | string> = {
   auth_verify_window_minutes: 15,
   contact_limit: 3,
   contact_window_minutes: 60,
+  chat_messages_per_minute: 20,
+  export_requests_per_hour: 30,
+  max_user_webhooks_per_project: 20,
   // Git & Deploy
   git_default_branch: 'master',
   git_merge_strategy: 'merge_commit',
@@ -150,6 +156,9 @@ const NUMERIC_BOUNDS: Record<string, { min: number; max: number }> = {
   auth_verify_window_minutes: { min: 5, max: 60 },
   contact_limit: { min: 1, max: 10 },
   contact_window_minutes: { min: 15, max: 1440 },
+  chat_messages_per_minute: { min: 1, max: 120 },
+  export_requests_per_hour: { min: 1, max: 200 },
+  max_user_webhooks_per_project: { min: 1, max: 100 },
   branch_name_max_length: { min: 15, max: 100 },
   queue_polling_interval_ms: { min: 1000, max: 30000 },
   test_multiplier_per_file: { min: 1, max: 10 },

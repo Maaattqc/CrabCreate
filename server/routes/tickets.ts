@@ -6,9 +6,63 @@ import { validate } from '../middleware/validate';
 import { checkTicketLimit } from '../middleware/plan-limit';
 import { createTicketSchema, updateTicketSchema, reorderTicketsSchema } from '../schemas';
 import { canModifyTicket, hasMinRole } from '../permissions';
+import { isAllowedProjectRepoId } from '../security/project-repo';
 import { dispatchWebhooks } from '../services/webhook-dispatcher';
 
 const router = Router();
+
+function normalizeDependsOnInput(raw: unknown): number[] | null {
+  if (raw === undefined) return [];
+
+  if (Array.isArray(raw)) {
+    if (raw.every(v => Number.isInteger(v) && v > 0)) {
+      return raw as number[];
+    }
+    return null;
+  }
+
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim();
+    if (!trimmed) return [];
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed) && parsed.every(v => Number.isInteger(v) && v > 0)) {
+        return parsed as number[];
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
+}
+
+function validateDependenciesProject(dependsOn: number[], projectId: number, currentTicketId?: number): boolean {
+  for (const depId of dependsOn) {
+    if (!Number.isInteger(depId) || depId <= 0) return false;
+    if (currentTicketId !== undefined && depId === currentTicketId) return false;
+    const depTicket = repo.findTicketById(depId);
+    if (!depTicket || depTicket.project_id !== projectId) return false;
+  }
+  return true;
+}
+
+function resolveProjectRepo(projectId: number, requestedRepo: unknown): string | null {
+  const project = repo.findProjectById(projectId);
+  if (!project || !project.default_repo) return null;
+
+  const projectRepoId = String(project.default_repo).trim();
+  if (!projectRepoId) return null;
+  if (!isAllowedProjectRepoId(projectId, projectRepoId)) return null;
+
+  if (requestedRepo === undefined || requestedRepo === null) return projectRepoId;
+  if (typeof requestedRepo !== 'string') return null;
+
+  const normalized = requestedRepo.trim();
+  if (!normalized) return projectRepoId;
+  return normalized === projectRepoId ? projectRepoId : null;
+}
 
 // GET /api/tickets -- List tickets (scoped to project)
 router.get('/', (req: Request, res: Response) => {
@@ -53,17 +107,30 @@ router.post('/', createTicketLimiter, checkTicketLimit, validate(createTicketSch
     assignee, target_files, tags, depends_on, due_date,
   } = req.body;
 
+  const normalizedDependsOn = normalizeDependsOnInput(depends_on);
+  if (!normalizedDependsOn || !validateDependenciesProject(normalizedDependsOn, req.project!.id)) {
+    return res.status(400).json({ error: 'Invalid depends_on: dependencies must belong to this project' });
+  }
+
+  const resolvedRepoId = resolveProjectRepo(req.project!.id, repoName);
+  if (!resolvedRepoId) {
+    return res.status(400).json({ error: 'Invalid repo: ticket repo must match project default repo' });
+  }
+  if (!repo.findRepoById(resolvedRepoId)) {
+    return res.status(400).json({ error: 'Project repository is not configured' });
+  }
+
   const ticket = repo.createTicket({
     title,
     description,
     priority,
     template,
     ai_model,
-    repo: repoName,
+    repo: resolvedRepoId,
     assignee,
-    target_files: JSON.stringify(target_files),
-    tags: JSON.stringify(tags),
-    depends_on: JSON.stringify(depends_on),
+    target_files,
+    tags,
+    depends_on: JSON.stringify(normalizedDependsOn),
     due_date: due_date || null,
   }, req.user!.userId, req.project!.id);
 
@@ -84,6 +151,25 @@ router.put('/:id', validate(updateTicketSchema), (req: Request, res: Response) =
   if (existing.project_id !== req.project!.id) return res.status(403).json({ error: 'Access denied' });
   if (!canModifyTicket(existing, req.user!.userId, req.project!.userRole)) {
     return res.status(403).json({ error: 'Access denied' });
+  }
+
+  if (req.body.depends_on !== undefined) {
+    const normalizedDependsOn = normalizeDependsOnInput(req.body.depends_on);
+    if (!normalizedDependsOn || !validateDependenciesProject(normalizedDependsOn, req.project!.id, ticketId)) {
+      return res.status(400).json({ error: 'Invalid depends_on: dependencies must belong to this project' });
+    }
+    req.body.depends_on = normalizedDependsOn;
+  }
+
+  if (req.body.repo !== undefined) {
+    const resolvedRepoId = resolveProjectRepo(req.project!.id, req.body.repo);
+    if (!resolvedRepoId) {
+      return res.status(400).json({ error: 'Invalid repo: ticket repo must match project default repo' });
+    }
+    if (!repo.findRepoById(resolvedRepoId)) {
+      return res.status(400).json({ error: 'Project repository is not configured' });
+    }
+    req.body.repo = resolvedRepoId;
   }
 
   const updated = repo.updateTicket(ticketId, req.body, req.user!.userId);

@@ -117,19 +117,27 @@ describe('createUserWebhookSchema', () => {
   it('accepts valid input', () => {
     const result = createUserWebhookSchema.safeParse({
       url: 'https://example.com/webhook',
-      events: ['ticket.created'],
+      events: ['ticket:created'],
     });
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.url).toBe('https://example.com/webhook');
-      expect(result.data.events).toEqual(['ticket.created']);
+      expect(result.data.events).toEqual(['ticket:created']);
     }
   });
 
   it('rejects invalid URL', () => {
     const result = createUserWebhookSchema.safeParse({
       url: 'not-a-url',
-      events: ['ticket.created'],
+      events: ['ticket:created'],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects non-https URL', () => {
+    const result = createUserWebhookSchema.safeParse({
+      url: 'http://example.com/webhook',
+      events: ['ticket:created'],
     });
     expect(result.success).toBe(false);
   });
@@ -138,6 +146,14 @@ describe('createUserWebhookSchema', () => {
     const result = createUserWebhookSchema.safeParse({
       url: 'https://example.com/webhook',
       events: [],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects too many events', () => {
+    const result = createUserWebhookSchema.safeParse({
+      url: 'https://example.com/webhook',
+      events: Array.from({ length: 11 }, () => 'ticket:created'),
     });
     expect(result.success).toBe(false);
   });
@@ -183,5 +199,21 @@ describe('createTicketSchema with due_date', () => {
     if (result.success) {
       expect(result.data.due_date).toBeUndefined();
     }
+  });
+
+  it('rejects too many tags', () => {
+    const result = createTicketSchema.safeParse({
+      title: 'Ticket with too many tags',
+      tags: Array.from({ length: 51 }, (_, i) => `tag-${i}`),
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects too many target files', () => {
+    const result = createTicketSchema.safeParse({
+      title: 'Ticket with too many files',
+      target_files: Array.from({ length: 201 }, (_, i) => `src/file-${i}.ts`),
+    });
+    expect(result.success).toBe(false);
   });
 });

@@ -71,12 +71,12 @@ export default function ListView({ tickets, onTicketClick, scoreThresholdGood = 
         <thead>
           <tr className="text-xs text-tx-faint uppercase tracking-wider border-b border-th-border">
             <th className="text-left py-2 px-3 font-medium">#</th>
-            <th className="text-left py-2 px-3 font-medium">Titre</th>
-            <th className="text-left py-2 px-3 font-medium">Statut</th>
+            <th className="text-left py-2 px-3 font-medium">{t.listTitle}</th>
+            <th className="text-left py-2 px-3 font-medium">{t.listStatus}</th>
             <th className="text-left py-2 px-3 font-medium">AI</th>
-            <th className="text-left py-2 px-3 font-medium">Score</th>
+            <th className="text-left py-2 px-3 font-medium">{t.score}</th>
             <th className="text-left py-2 px-3 font-medium">{t.dueDate}</th>
-            <th className="text-left py-2 px-3 font-medium">Progress</th>
+            <th className="text-left py-2 px-3 font-medium">{t.listProgress}</th>
           </tr>
         </thead>
         <tbody>

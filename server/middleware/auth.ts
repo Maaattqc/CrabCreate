@@ -56,7 +56,7 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
     // Verify user still exists
     const user = repo.findUserById(payload.userId);
     if (!user) {
-      res.status(401).json({ error: 'User not found' });
+      res.status(401).json({ error: 'Invalid or expired token' });
       return;
     }
 

@@ -92,8 +92,25 @@ function initSocket(httpServer: http.Server): Server {
       if (!token) {
         return next(new Error('Authentication required'));
       }
-      const payload = jwt.verify(token, config.jwtSecret, { algorithms: ['HS512'] }) as JwtPayload;
-      socket.data.user = payload;
+      const payload = jwt.verify(token, config.jwtSecret, { algorithms: ['HS512'] }) as JwtPayload & { iat?: number };
+
+      const user = repo.findUserById(payload.userId);
+      if (!user) {
+        return next(new Error('Authentication failed'));
+      }
+      if (user.blocked === 1) {
+        return next(new Error('Authentication failed'));
+      }
+
+      const invalidatedAt = repo.getUserTokenInvalidatedAt(payload.userId);
+      if (invalidatedAt && payload.iat) {
+        const invalidatedTimestamp = Math.floor(new Date(invalidatedAt).getTime() / 1000);
+        if (payload.iat <= invalidatedTimestamp) {
+          return next(new Error('Authentication failed'));
+        }
+      }
+
+      socket.data.user = { userId: payload.userId, email: user.email };
       next();
     } catch {
       next(new Error('Authentication failed'));
@@ -127,6 +144,8 @@ function initSocket(httpServer: http.Server): Server {
 
     socket.on('project:leave', (projectId: number) => {
       if (!userId) return;
+      if (!Number.isInteger(projectId) || projectId <= 0) return;
+      if (!isInProjectRoom(socket, projectId)) return;
       removeFromPresence(projectId, socket.id);
       io!.to(`project:${projectId}`).emit('presence:sync', { projectId, users: getPresenceList(projectId) });
       socket.to(`project:${projectId}`).emit('cursor:remove', { userId });

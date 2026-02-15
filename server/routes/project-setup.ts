@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
 import * as repo from '../db/repositories';
 import { validate } from '../middleware/validate';
-import { connectRepoSchema, createRepoSchema } from '../schemas';
+import { connectRepoSchema, createRepoSchema, configureDeploySchema } from '../schemas';
 import { createGitProvider, buildCloneUrl } from '../services/git-providers';
 import * as cloudflarePages from '../services/cloudflare-pages';
 import * as supabase from '../services/supabase';
@@ -69,8 +69,7 @@ router.post('/connect-repo', validate(connectRepoSchema), async (req: Request, r
     res.json({ success: true, repoId });
   } catch (err) {
     logger.error('[ProjectSetup] connect-repo error:', err);
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    res.status(500).json({ error: message });
+    res.status(500).json({ error: 'Setup operation failed' });
   }
 });
 
@@ -123,13 +122,12 @@ router.post('/create-repo', validate(createRepoSchema), async (req: Request, res
     res.json({ success: true, repoId, webUrl: result.webUrl });
   } catch (err) {
     logger.error('[ProjectSetup] create-repo error:', err);
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    res.status(500).json({ error: message });
+    res.status(500).json({ error: 'Setup operation failed' });
   }
 });
 
 // POST /api/projects/:id/setup/configure-deploy
-router.post('/configure-deploy', async (req: Request, res: Response) => {
+router.post('/configure-deploy', validate(configureDeploySchema), async (req: Request, res: Response) => {
   if (!requireProjectAdmin(req, res)) return;
 
   const cfApiToken = process.env.CF_API_TOKEN;
@@ -182,8 +180,7 @@ router.post('/configure-deploy', async (req: Request, res: Response) => {
     res.json({ success: true, siteUrl: cfResult.url, tenantId });
   } catch (err) {
     logger.error('[ProjectSetup] configure-deploy error:', err);
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    res.status(500).json({ error: message });
+    res.status(500).json({ error: 'Setup operation failed' });
   }
 });
 

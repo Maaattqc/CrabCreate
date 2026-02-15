@@ -5,7 +5,7 @@ const router = Router();
 
 // GET /api/favorites
 router.get('/', (req: Request, res: Response) => {
-  const favorites = repo.findFavoritesByUserId(req.user!.userId);
+  const favorites = repo.findFavoritesByUserIdInProject(req.user!.userId, req.project!.id);
   res.json(favorites);
 });
 
