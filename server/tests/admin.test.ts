@@ -121,7 +121,7 @@ describe('admin routes', () => {
       .send({ plan: 'vip' });
 
     expect(res.status).toBe(400);
-    expect(res.body).toEqual({ error: 'Invalid plan' });
+    expect(res.body).toEqual({ error: 'Validation failed', details: expect.any(Array) });
     expect(mocks.updateUserPlan).not.toHaveBeenCalled();
   });
 

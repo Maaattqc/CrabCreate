@@ -16,6 +16,6 @@ export async function stripeWebhookHandler(req: Request, res: Response): Promise
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
     logger.error(`[Stripe Webhook] Error: ${message}`);
-    res.status(400).json({ error: `Webhook error: ${message}` });
+    res.status(400).json({ error: 'Webhook processing failed' });
   }
 }

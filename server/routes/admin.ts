@@ -2,8 +2,15 @@ import { Router, Request, Response } from 'express';
 import rateLimit from 'express-rate-limit';
 import * as repo from '../db/repositories';
 import { requireAdmin } from '../middleware/auth';
+import { validate } from '../middleware/validate';
+import { adminBlockSchema, adminPlanSchema, adminToggleSchema } from '../schemas';
 
 const router = Router();
+
+function parseId(raw: string): number | null {
+  const n = parseInt(raw, 10);
+  return isNaN(n) || n <= 0 ? null : n;
+}
 
 // All admin routes require admin
 router.use(requireAdmin);
@@ -35,8 +42,9 @@ router.get('/users', (req: Request, res: Response) => {
 });
 
 // PUT /api/admin/users/:id/block — block/unblock a user
-router.put('/users/:id/block', adminWriteLimiter, (req: Request, res: Response) => {
-  const userId = Number(req.params.id);
+router.put('/users/:id/block', adminWriteLimiter, validate(adminBlockSchema), (req: Request, res: Response) => {
+  const userId = parseId(req.params.id as string);
+  if (!userId) return res.status(400).json({ error: 'Invalid user ID' });
   const user = repo.findUserById(userId);
   if (!user) return res.status(404).json({ error: 'User not found' });
 
@@ -46,31 +54,28 @@ router.put('/users/:id/block', adminWriteLimiter, (req: Request, res: Response) 
   }
 
   const { blocked, reason } = req.body;
-  repo.updateUserBlocked(userId, !!blocked, reason || undefined);
+  repo.updateUserBlocked(userId, blocked, reason || undefined);
   repo.insertAuditLog(req.user!.userId, req.user!.email, blocked ? 'user_block' : 'user_unblock', 'user', userId, reason);
   res.json({ success: true });
 });
 
 // PUT /api/admin/users/:id/plan — change user plan
-router.put('/users/:id/plan', adminWriteLimiter, (req: Request, res: Response) => {
-  const userId = Number(req.params.id);
+router.put('/users/:id/plan', adminWriteLimiter, validate(adminPlanSchema), (req: Request, res: Response) => {
+  const userId = parseId(req.params.id as string);
+  if (!userId) return res.status(400).json({ error: 'Invalid user ID' });
   const user = repo.findUserById(userId);
   if (!user) return res.status(404).json({ error: 'User not found' });
 
   const { plan } = req.body;
-  const validPlans = ['free', 'pro', 'enterprise'];
-  if (!validPlans.includes(plan)) {
-    return res.status(400).json({ error: 'Invalid plan' });
-  }
-
   repo.updateUserPlan(userId, plan);
   repo.insertAuditLog(req.user!.userId, req.user!.email, 'user_plan_change', 'user', userId, plan);
   res.json({ success: true });
 });
 
 // PUT /api/admin/users/:id/admin — toggle admin status
-router.put('/users/:id/admin', adminWriteLimiter, (req: Request, res: Response) => {
-  const userId = Number(req.params.id);
+router.put('/users/:id/admin', adminWriteLimiter, validate(adminToggleSchema), (req: Request, res: Response) => {
+  const userId = parseId(req.params.id as string);
+  if (!userId) return res.status(400).json({ error: 'Invalid user ID' });
   const user = repo.findUserById(userId);
   if (!user) return res.status(404).json({ error: 'User not found' });
 
@@ -79,7 +84,7 @@ router.put('/users/:id/admin', adminWriteLimiter, (req: Request, res: Response) 
   }
 
   const { isAdmin } = req.body;
-  repo.setUserAdmin(userId, !!isAdmin);
+  repo.setUserAdmin(userId, isAdmin);
   repo.insertAuditLog(req.user!.userId, req.user!.email, isAdmin ? 'user_promote_admin' : 'user_demote_admin', 'user', userId);
   res.json({ success: true });
 });
@@ -92,7 +97,9 @@ router.get('/contacts', (req: Request, res: Response) => {
 
 // DELETE /api/admin/contacts/:id — delete a contact message
 router.delete('/contacts/:id', (req: Request, res: Response) => {
-  repo.deleteContactMessage(Number(req.params.id));
+  const msgId = parseId(req.params.id as string);
+  if (!msgId) return res.status(400).json({ error: 'Invalid ID' });
+  repo.deleteContactMessage(msgId);
   res.json({ success: true });
 });
 
@@ -128,25 +135,28 @@ router.get('/logs', (req: Request, res: Response) => {
   const limit = Math.min(Number(req.query.limit) || defaultLimit, maxLimit);
   const offset = Math.min(Math.max(Number(req.query.offset) || 0, 0), 10000);
   const category = req.query.category as string | undefined;
-  // category maps to action prefix: "auth" -> login/dev_login, "ticket" -> ticket_*, "pipeline" -> pipeline_*, "admin" -> user_*
+  // category maps to action prefix: "auth" -> login/dev_login, "ticket" -> ticket_*, "pipeline" -> pipeline_*, "admin" -> user_*, "project" -> project_*, "delete" -> *_delete
   const filterMap: Record<string, string> = {
     auth: 'login',
     ticket: 'ticket_',
     pipeline: 'pipeline_',
     admin: 'user_',
     feedback: 'onboard_feedback',
+    project: 'project_',
   };
-  // For auth, we need to match both "login" and "dev_login"
+  // Multi-pattern categories (need multiple queries merged)
+  const multiFilterMap: Record<string, string[]> = {
+    auth: ['login', 'dev_login'],
+    delete: ['ticket_delete', 'project_delete', 'comment_delete', 'contact_delete'],
+  };
   let actionFilter: string | undefined;
-  if (category === 'auth') {
-    // Special case: match login OR dev_login — use two queries
-    const loginLogs = repo.findAuditLogs(limit, offset, 'login');
-    const devLoginLogs = repo.findAuditLogs(limit, offset, 'dev_login');
-    const allLogs = [...loginLogs, ...devLoginLogs]
-      .sort((a, b) => b.created_at.localeCompare(a.created_at))
-      .slice(0, limit);
-    const total = repo.countAuditLogs('login') + repo.countAuditLogs('dev_login');
-    res.json({ logs: allLogs, total });
+  if (category && multiFilterMap[category]) {
+    const patterns = multiFilterMap[category];
+    const allLogs = patterns.flatMap(p => repo.findAuditLogs(limit, offset, p));
+    allLogs.sort((a, b) => b.created_at.localeCompare(a.created_at));
+    const logs = allLogs.slice(0, limit);
+    const total = patterns.reduce((sum, p) => sum + repo.countAuditLogs(p), 0);
+    res.json({ logs, total });
     return;
   } else if (category && filterMap[category]) {
     actionFilter = filterMap[category];

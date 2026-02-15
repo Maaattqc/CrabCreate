@@ -60,8 +60,13 @@ export default function PricingPage() {
         credentials: 'include',
       });
       const data = await res.json();
-      if (data.url && data.url.startsWith('https://')) {
-        window.location.href = data.url;
+      if (data.url) {
+        try {
+          const parsed = new URL(data.url);
+          if (['checkout.stripe.com', 'billing.stripe.com'].includes(parsed.hostname)) {
+            window.location.href = data.url;
+          }
+        } catch { /* invalid URL */ }
       }
     } catch {
       setCheckoutLoading(false);

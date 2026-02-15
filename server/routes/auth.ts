@@ -1,10 +1,11 @@
 import { Router, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import rateLimit from 'express-rate-limit';
 import config from '../config';
 import * as repo from '../db/repositories';
 import { validate } from '../middleware/validate';
-import { requestCodeSchema, verifyCodeSchema } from '../schemas';
+import { requestCodeSchema, verifyCodeSchema, preferencesSchema } from '../schemas';
 import { sendAuthCode } from '../services/email';
 import { requireAuth, type JwtPayload } from '../middleware/auth';
 import type { UserPreferences } from '../types';
@@ -30,7 +31,7 @@ const verifyCodeLimiter = rateLimit({
 });
 
 function generateCode(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+  return crypto.randomInt(10000000, 100000000).toString();
 }
 
 function getSessionDurationDays(): number {
@@ -76,6 +77,7 @@ function userResponse(user: { id: number; email: string; is_admin: number; plan?
     id: user.id,
     email: user.email,
     isAdmin: user.is_admin === 1,
+    isVisitor: /^new-client-\d+@crabcreate\.dev$/.test(user.email),
     plan: user.plan || 'free',
     stripeSubscriptionStatus: user.stripe_subscription_status || null,
     preferences: parsePreferences(user.preferences),
@@ -86,27 +88,22 @@ function userResponse(user: { id: number; email: string; is_admin: number; plan?
 router.post('/request-code', requestCodeLimiter, validate(requestCodeSchema), async (req: Request, res: Response) => {
   // Check if registration is enabled (existing users can still log in)
   const { email } = req.body;
+  // Always perform the same operations to prevent user enumeration via timing
   const existingUser = repo.findUserByEmail(email);
-  if (!existingUser && repo.getConfig('registration_enabled') === '0') {
-    res.status(403).json({ error: 'Les inscriptions sont désactivées.' });
-    return;
-  }
-
   const recent = repo.countRecentAuthCodes(email, 15);
-  if (recent >= 5) {
-    res.json({ message: 'Si cette adresse est valide, un code a été envoyé.' });
-    return;
+  const registrationDisabled = !existingUser && repo.getConfig('registration_enabled') === '0';
+
+  if (!registrationDisabled && recent < 5) {
+    repo.invalidateAuthCodes(email);
+
+    const code = generateCode();
+    const codeExpiryMinutes = parseInt(repo.getConfig('auth_code_expiry_minutes') || '10', 10);
+    const expiresAt = new Date(Date.now() + codeExpiryMinutes * 60 * 1000).toISOString().replace('T', ' ').replace('Z', '');
+    repo.createAuthCode(email, code, expiresAt);
+
+    const lang = detectLang(req, email);
+    sendAuthCode(email, code, lang).catch(() => {});
   }
-
-  repo.invalidateAuthCodes(email);
-
-  const code = generateCode();
-  const codeExpiryMinutes = parseInt(repo.getConfig('auth_code_expiry_minutes') || '10', 10);
-  const expiresAt = new Date(Date.now() + codeExpiryMinutes * 60 * 1000).toISOString().replace('T', ' ').replace('Z', '');
-  repo.createAuthCode(email, code, expiresAt);
-
-  const lang = detectLang(req, email);
-  sendAuthCode(email, code, lang).catch(() => {});
 
   res.json({ message: 'Si cette adresse est valide, un code a été envoyé.' });
 });
@@ -130,7 +127,8 @@ router.post('/verify-code', verifyCodeLimiter, validate(verifyCodeSchema), (req:
     return;
   }
 
-  if (latestCode.code !== code) {
+  const codeMatch = repo.isAuthCodeMatch(latestCode.code, code);
+  if (!codeMatch) {
     res.status(400).json({ error: 'Code invalide ou expiré.' });
     return;
   }
@@ -148,6 +146,7 @@ router.post('/verify-code', verifyCodeLimiter, validate(verifyCodeSchema), (req:
     }
   }
   repo.updateUserLastLogin(user.id);
+  repo.clearTokenInvalidation(user.id);
 
   const payload: JwtPayload = { userId: user.id, email: user.email };
   const token = jwt.sign(payload, config.jwtSecret, { algorithm: 'HS512', expiresIn: `${getSessionDurationDays()}d` });
@@ -181,6 +180,7 @@ router.post('/dev-login', (req: Request, res: Response) => {
     user = repo.findUserById(user.id)!;
   }
   repo.updateUserLastLogin(user.id);
+  repo.clearTokenInvalidation(user.id);
 
   const payload: JwtPayload = { userId: user.id, email: user.email };
   const token = jwt.sign(payload, config.jwtSecret, { algorithm: 'HS512', expiresIn: `${getSessionDurationDays()}d` });
@@ -208,6 +208,7 @@ router.post('/dev-login-client', (req: Request, res: Response) => {
     user = repo.findUserById(user.id)!;
   }
   repo.updateUserLastLogin(user.id);
+  repo.clearTokenInvalidation(user.id);
 
   const payload: JwtPayload = { userId: user.id, email: user.email };
   const token = jwt.sign(payload, config.jwtSecret, { algorithm: 'HS512', expiresIn: `${getSessionDurationDays()}d` });
@@ -233,6 +234,7 @@ router.post('/dev-login-new', (req: Request, res: Response) => {
   let user = repo.createUser(newEmail);
   user = repo.findUserById(user.id)!;
   repo.updateUserLastLogin(user.id);
+  repo.clearTokenInvalidation(user.id);
 
   const payload: JwtPayload = { userId: user.id, email: user.email };
   const token = jwt.sign(payload, config.jwtSecret, { algorithm: 'HS512', expiresIn: `${getSessionDurationDays()}d` });
@@ -243,8 +245,22 @@ router.post('/dev-login-new', (req: Request, res: Response) => {
 });
 
 // POST /api/auth/logout
-router.post('/logout', (_req: Request, res: Response) => {
-  res.clearCookie('crab_token', { path: '/' });
+router.post('/logout', (req: Request, res: Response) => {
+  // Invalidate all existing tokens for this user
+  const token = req.cookies?.crab_token;
+  if (token) {
+    try {
+      const payload = jwt.verify(token, config.jwtSecret, { algorithms: ['HS512'] }) as JwtPayload;
+      repo.invalidateUserTokens(payload.userId);
+    } catch { /* token already expired, ignore */ }
+  }
+
+  res.clearCookie('crab_token', {
+    path: '/',
+    httpOnly: true,
+    secure: config.nodeEnv === 'production',
+    sameSite: 'strict',
+  });
   res.json({ message: 'Déconnecté' });
 });
 
@@ -270,7 +286,7 @@ router.get('/me', (req: Request, res: Response) => {
 });
 
 // PUT /api/auth/preferences (protected)
-router.put('/preferences', requireAuth, (req: Request, res: Response) => {
+router.put('/preferences', requireAuth, validate(preferencesSchema), (req: Request, res: Response) => {
   const user = repo.findUserById(req.user!.userId);
   if (!user) {
     res.status(401).json({ error: 'User not found' });

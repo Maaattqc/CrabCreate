@@ -3,6 +3,26 @@ import * as repo from '../db/repositories';
 
 const router = Router();
 
+/** Escape HTML special characters to prevent XSS */
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/** Escape a CSV field: quote it and neutralize formula injection */
+function escapeCsvField(value: string): string {
+  // Prefix formula-triggering characters to prevent CSV injection in Excel
+  let safe = value;
+  if (/^[=+\-@\t\r]/.test(safe)) {
+    safe = `'${safe}`;
+  }
+  return `"${safe.replace(/"/g, '""')}"`;
+}
+
 // GET /api/export/csv
 router.get('/csv', (req: Request, res: Response) => {
   const projectId = req.project!.id;
@@ -11,13 +31,13 @@ router.get('/csv', (req: Request, res: Response) => {
   const headers = ['ID', 'Title', 'Status', 'Priority', 'Assignee', 'Due Date', 'Created', 'Updated'];
   const rows = tickets.map(t => [
     t.id,
-    `"${(t.title || '').replace(/"/g, '""')}"`,
-    t.status,
-    t.priority,
-    t.assignee,
-    t.due_date || '',
-    t.created_at,
-    t.updated_at,
+    escapeCsvField(t.title || ''),
+    escapeCsvField(t.status || ''),
+    escapeCsvField(t.priority || ''),
+    escapeCsvField(t.assignee || ''),
+    escapeCsvField(t.due_date || ''),
+    escapeCsvField(t.created_at || ''),
+    escapeCsvField(t.updated_at || ''),
   ].join(','));
 
   const csv = [headers.join(','), ...rows].join('\n');
@@ -63,11 +83,11 @@ router.get('/pdf', (req: Request, res: Response) => {
       ${tickets.map(t => `
         <tr>
           <td>${t.id}</td>
-          <td>${t.title}</td>
-          <td>${t.status}</td>
-          <td class="priority-${t.priority}">${t.priority}</td>
-          <td>${t.assignee}</td>
-          <td>${t.due_date || '-'}</td>
+          <td>${escapeHtml(t.title || '')}</td>
+          <td>${escapeHtml(t.status || '')}</td>
+          <td class="priority-${escapeHtml(t.priority || '')}">${escapeHtml(t.priority || '')}</td>
+          <td>${escapeHtml(t.assignee || '')}</td>
+          <td>${escapeHtml(t.due_date || '-')}</td>
         </tr>
       `).join('')}
     </tbody>

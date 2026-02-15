@@ -325,6 +325,18 @@ export default function Header({ search, onSearchChange, viewMode, onViewModeCha
               >
                 {t.exportPDF}
               </button>
+              <button
+                onClick={async () => {
+                  try {
+                    const { exportHTML } = await import('../../api/export');
+                    await exportHTML();
+                  } catch { /* ignore */ }
+                  setExportOpen(false);
+                }}
+                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-tx-secondary hover:bg-subtle-hover transition-colors"
+              >
+                {t.exportHTML}
+              </button>
             </div>
           </div>
         )}
@@ -456,7 +468,9 @@ export default function Header({ search, onSearchChange, viewMode, onViewModeCha
                       try {
                         const res = await fetch('/api/billing/portal', { method: 'POST', credentials: 'include' });
                         const data = await res.json();
-                        if (data.url && data.url.startsWith('https://')) window.location.href = data.url;
+                        if (data.url) {
+                          try { const u = new URL(data.url); if (['checkout.stripe.com', 'billing.stripe.com'].includes(u.hostname)) window.location.href = data.url; } catch { /* invalid */ }
+                        }
                       } catch { /* ignore */ }
                       setMenuOpen(false);
                     }}
@@ -477,7 +491,9 @@ export default function Header({ search, onSearchChange, viewMode, onViewModeCha
                           credentials: 'include',
                         });
                         const data = await res.json();
-                        if (data.url && data.url.startsWith('https://')) window.location.href = data.url;
+                        if (data.url) {
+                          try { const u = new URL(data.url); if (['checkout.stripe.com', 'billing.stripe.com'].includes(u.hostname)) window.location.href = data.url; } catch { /* invalid */ }
+                        }
                       } catch { /* ignore */ }
                       setMenuOpen(false);
                     }}
@@ -495,7 +511,7 @@ export default function Header({ search, onSearchChange, viewMode, onViewModeCha
                   <div className="border-t border-th-border mx-2" />
                   <div className="p-2">
                     <button
-                      onClick={() => { navigate('/admin'); setMenuOpen(false); }}
+                      onClick={() => { window.location.href = '/admin'; }}
                       className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-amber-500/10 transition-colors"
                     >
                       <Crown size={16} className="text-amber-400" />

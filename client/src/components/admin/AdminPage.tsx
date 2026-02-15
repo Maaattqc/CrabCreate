@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Users, Mail, Settings, BarChart3, Shield, ShieldOff, Crown, Trash2,
-  ArrowLeft, X, AlertTriangle, ScrollText,
+  ArrowLeft, X, AlertTriangle, ScrollText, Loader2,
   Brain, Lock, Workflow, Wrench, CreditCard, Cpu, GitBranch, Monitor,
 } from 'lucide-react';
 import { useLanguage } from '../../hooks/useLanguage';
@@ -165,6 +165,7 @@ export default function AdminPage() {
   const [logsCategory, setLogsCategory] = useState<string>('all');
   const [blockModal, setBlockModal] = useState<{ userId: number; email: string } | null>(null);
   const [blockReason, setBlockReason] = useState('');
+  const [initialLoading, setInitialLoading] = useState(true);
 
   // Redirect non-admin
   useEffect(() => {
@@ -211,6 +212,8 @@ export default function AdminPage() {
       fetchLogs(0, logsCategory);
     } catch (err) {
       console.error('[Admin] fetch error', err);
+    } finally {
+      setInitialLoading(false);
     }
   }, [fetchLogs, logsCategory]);
 
@@ -281,6 +284,15 @@ export default function AdminPage() {
     pro: 'text-amber-400 bg-amber-500/10',
     enterprise: 'text-purple-400 bg-purple-500/10',
   };
+
+  if (initialLoading) {
+    return (
+      <div className="h-screen flex flex-col items-center justify-center text-tx-primary" style={{ background: 'var(--bg-gradient)' }}>
+        <Loader2 size={32} className="text-amber-400 animate-spin mb-4" />
+        <p className="text-sm text-tx-faint">{t.adminTitle}...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen flex flex-col text-tx-primary overflow-hidden" style={{ background: 'var(--bg-gradient)' }}>
@@ -1083,14 +1095,24 @@ function LogsTab({ logs, total, loading, category, onCategoryChange, onLoadMore,
     user_promote_admin: 'text-amber-400 bg-amber-500/10',
     user_demote_admin: 'text-gray-400 bg-gray-500/10',
     onboard_feedback: 'text-indigo-400 bg-indigo-500/10',
+    project_create: 'text-emerald-400 bg-emerald-500/10',
+    project_update: 'text-emerald-400 bg-emerald-500/10',
+    project_invite: 'text-teal-400 bg-teal-500/10',
+    project_join: 'text-teal-400 bg-teal-500/10',
+    project_delete: 'text-red-400 bg-red-500/10',
+    comment_delete: 'text-red-400 bg-red-500/10',
+    contact_delete: 'text-red-400 bg-red-500/10',
+    ticket_reorder: 'text-blue-300 bg-blue-400/10',
   };
 
   const categories = [
-    { key: 'all', label: t.adminLogFilterAll || 'Tous', color: 'text-tx-secondary border-tx-faint' },
-    { key: 'auth', label: t.adminLogFilterAuth || 'Auth', color: 'text-green-400 border-green-500/40' },
-    { key: 'ticket', label: t.adminLogFilterTicket || 'Tickets', color: 'text-blue-400 border-blue-500/40' },
-    { key: 'pipeline', label: t.adminLogFilterPipeline || 'Pipeline', color: 'text-cyan-400 border-cyan-500/40' },
-    { key: 'admin', label: t.adminLogFilterAdmin || 'Admin', color: 'text-amber-400 border-amber-500/40' },
+    { key: 'all', label: t.adminLogFilterAll, color: 'text-tx-secondary border-tx-faint' },
+    { key: 'auth', label: t.adminLogFilterAuth, color: 'text-green-400 border-green-500/40' },
+    { key: 'ticket', label: t.adminLogFilterTicket, color: 'text-blue-400 border-blue-500/40' },
+    { key: 'project', label: t.adminLogFilterProject, color: 'text-emerald-400 border-emerald-500/40' },
+    { key: 'pipeline', label: t.adminLogFilterPipeline, color: 'text-cyan-400 border-cyan-500/40' },
+    { key: 'admin', label: t.adminLogFilterAdmin, color: 'text-amber-400 border-amber-500/40' },
+    { key: 'delete', label: t.adminLogFilterDelete, color: 'text-red-400 border-red-500/40' },
     { key: 'feedback', label: t.adminLogFilterFeedback, color: 'text-indigo-400 border-indigo-500/40' },
   ];
 

@@ -14,6 +14,7 @@ export interface Config {
   port: number;
   nodeEnv: string;
   clientUrl: string;
+  trustProxy: number;
   dbPath: string;
   anthropicApiKey: string;
   openaiApiKey: string;
@@ -37,6 +38,7 @@ const config: Config = {
   port: parseInt(process.env.PORT || '3000', 10),
   nodeEnv: process.env.NODE_ENV || 'development',
   clientUrl: process.env.CLIENT_URL || 'http://localhost:5173',
+  trustProxy: parseInt(process.env.TRUST_PROXY || (process.env.NODE_ENV === 'production' ? '1' : '0'), 10),
   dbPath: process.env.DB_PATH || path.join(__dirname, 'db', 'kanban.db'),
   anthropicApiKey: process.env.ANTHROPIC_API_KEY || '',
   openaiApiKey: process.env.OPENAI_API_KEY || '',

@@ -119,10 +119,14 @@ export function useTickets() {
     setTickets(prev => prev.filter(t => t.id !== ticketId));
   }, []);
 
+  const clearTickets = useCallback(() => {
+    setTickets([]);
+  }, []);
+
   return {
     tickets, loading, filters, setFilters,
     fetchTickets, resetAndFetch, create, update, remove,
     launch, approve, reject, retry, rollback,
-    updateTicketInState, insertLocalTicket, removeLocalTicket, reorder,
+    updateTicketInState, insertLocalTicket, removeLocalTicket, reorder, clearTickets,
   };
 }

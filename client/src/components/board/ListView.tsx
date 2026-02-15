@@ -1,6 +1,11 @@
+import { useState } from 'react';
 import { getColumnColor, COLUMNS } from '../../constants';
 import { useLanguage } from '../../hooks/useLanguage';
 import type { Ticket } from '../../types';
+
+type ListFilter = 'all' | 'active' | 'completed';
+
+const COMPLETED_STATUSES = ['approved', 'rejected'];
 
 interface ListViewProps {
   tickets: Ticket[];
@@ -29,9 +34,39 @@ function formatDueDate(dateStr: string | null): { text: string; className: strin
 
 export default function ListView({ tickets, onTicketClick, scoreThresholdGood = 70, scoreThresholdOk = 50 }: ListViewProps) {
   const { t } = useLanguage();
+  const [filter, setFilter] = useState<ListFilter>('all');
+
+  const filters: { key: ListFilter; label: string }[] = [
+    { key: 'all', label: t.historyAll },
+    { key: 'active', label: t.historyActive },
+    { key: 'completed', label: t.historyCompleted },
+  ];
+
+  const filtered = tickets.filter(tk => {
+    if (filter === 'completed') return COMPLETED_STATUSES.includes(tk.status);
+    if (filter === 'active') return !COMPLETED_STATUSES.includes(tk.status);
+    return true;
+  });
 
   return (
     <div className="flex-1 overflow-auto p-4">
+      {/* Filter tabs */}
+      <div className="flex gap-1.5 mb-3">
+        {filters.map(f => (
+          <button
+            key={f.key}
+            onClick={() => setFilter(f.key)}
+            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+              filter === f.key
+                ? 'bg-amber-500/15 text-amber-400'
+                : 'bg-subtle text-tx-faint hover:text-tx-tertiary hover:bg-subtle-hover'
+            }`}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+
       <table className="w-full">
         <thead>
           <tr className="text-xs text-tx-faint uppercase tracking-wider border-b border-th-border">
@@ -45,7 +80,7 @@ export default function ListView({ tickets, onTicketClick, scoreThresholdGood = 
           </tr>
         </thead>
         <tbody>
-          {tickets.map(ticket => {
+          {filtered.map(ticket => {
             const statusColor = getColumnColor(ticket.status);
             const statusLabel = COLUMNS.find(c => c.id === ticket.status)?.label || ticket.status;
             return (
@@ -87,8 +122,8 @@ export default function ListView({ tickets, onTicketClick, scoreThresholdGood = 
           })}
         </tbody>
       </table>
-      {tickets.length === 0 && (
-        <div className="text-center text-tx-ghost py-16 text-sm">Aucun ticket</div>
+      {filtered.length === 0 && (
+        <div className="text-center text-tx-ghost py-16 text-sm">{t.historyEmpty}</div>
       )}
     </div>
   );

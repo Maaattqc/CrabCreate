@@ -16,6 +16,10 @@ router.post('/:ticketId', (req: Request, res: Response) => {
   if (!ticket) {
     return res.status(404).json({ error: 'Ticket not found' });
   }
+  // Verify ticket belongs to the current project
+  if (ticket.project_id !== req.project!.id) {
+    return res.status(404).json({ error: 'Ticket not found' });
+  }
   const result = repo.toggleFavorite(req.user!.userId, ticketId);
   res.json(result);
 });
@@ -23,6 +27,10 @@ router.post('/:ticketId', (req: Request, res: Response) => {
 // GET /api/favorites/check/:ticketId
 router.get('/check/:ticketId', (req: Request, res: Response) => {
   const ticketId = Number(req.params.ticketId);
+  const ticket = repo.findTicketById(ticketId);
+  if (!ticket || ticket.project_id !== req.project!.id) {
+    return res.json({ favorited: false });
+  }
   const favorited = repo.isFavorite(req.user!.userId, ticketId);
   res.json({ favorited });
 });

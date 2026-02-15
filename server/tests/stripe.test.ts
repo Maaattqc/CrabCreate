@@ -360,7 +360,7 @@ describe('stripeWebhookHandler', () => {
 
     expect(res.status).toHaveBeenCalledWith(400);
     expect(res.json).toHaveBeenCalledWith(
-      expect.objectContaining({ error: expect.stringContaining('Invalid signature') }),
+      expect.objectContaining({ error: 'Webhook processing failed' }),
     );
   });
 

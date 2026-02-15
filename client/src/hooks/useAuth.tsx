@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 
 export interface UserPreferences {
   lang?: 'fr' | 'en';
@@ -12,6 +12,7 @@ export interface AuthUser {
   id: number;
   email: string;
   isAdmin: boolean;
+  isVisitor: boolean;
   plan: string;
   stripeSubscriptionStatus: string | null;
   preferences: UserPreferences;
@@ -31,7 +32,7 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
   requestCode: async () => ({ message: '' }),
-  verifyCode: async () => ({ id: 0, email: '', isAdmin: false, plan: 'free', stripeSubscriptionStatus: null, preferences: {} }),
+  verifyCode: async () => ({ id: 0, email: '', isAdmin: false, isVisitor: false, plan: 'free', stripeSubscriptionStatus: null, preferences: {} }),
   activateSession: () => {},
   updatePreferences: async () => {},
   logout: async () => {},
@@ -42,6 +43,7 @@ const API = '/api/auth';
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const sessionActivatedRef = useRef(false);
 
   useEffect(() => {
     fetch(`${API}/me`, { credentials: 'include' })
@@ -49,8 +51,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (res.ok) return res.json();
         throw new Error('Not authenticated');
       })
-      .then(data => setUser(data.user))
-      .catch(() => setUser(null))
+      .then(data => {
+        if (!sessionActivatedRef.current) setUser(data.user);
+      })
+      .catch(() => {
+        if (!sessionActivatedRef.current) setUser(null);
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -79,7 +85,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const activateSession = useCallback((u: AuthUser) => {
+    sessionActivatedRef.current = true;
     setUser(u);
+    setLoading(false);
   }, []);
 
   const updatePreferences = useCallback(async (prefs: Partial<UserPreferences>) => {

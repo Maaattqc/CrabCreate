@@ -15,8 +15,8 @@ const TEMPLATE_PREFIXES: Record<string, string> = {
 
 const router = Router();
 
-// GET /api/prompts
-router.get('/', (req: Request, res: Response) => {
+// GET /api/prompts — admin only (system prompt may contain sensitive instructions)
+router.get('/', requireAdmin, (req: Request, res: Response) => {
   const systemPrompt = repo.getConfig('system_prompt');
   res.json({
     systemPrompt: systemPrompt || '',

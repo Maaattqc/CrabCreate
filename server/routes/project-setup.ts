@@ -6,9 +6,18 @@ import { connectRepoSchema, createRepoSchema } from '../schemas';
 import { createGitProvider, buildCloneUrl } from '../services/git-providers';
 import * as cloudflarePages from '../services/cloudflare-pages';
 import * as supabase from '../services/supabase';
+import { hasMinRole } from '../permissions';
 import logger from '../services/logger';
 
 const router = Router();
+
+function requireProjectAdmin(req: Request, res: Response): boolean {
+  if (!hasMinRole(req.project!.userRole, 'admin')) {
+    res.status(403).json({ error: 'Admin access required' });
+    return false;
+  }
+  return true;
+}
 
 // GET /api/projects/:id/setup/status
 router.get('/status', (req: Request, res: Response) => {
@@ -18,6 +27,8 @@ router.get('/status', (req: Request, res: Response) => {
 
 // POST /api/projects/:id/setup/connect-repo
 router.post('/connect-repo', validate(connectRepoSchema), async (req: Request, res: Response) => {
+  if (!requireProjectAdmin(req, res)) return;
+
   const { provider, owner, repo: repoName, token, branch } = req.body;
   const projectId = req.project!.id;
 
@@ -65,6 +76,8 @@ router.post('/connect-repo', validate(connectRepoSchema), async (req: Request, r
 
 // POST /api/projects/:id/setup/create-repo
 router.post('/create-repo', validate(createRepoSchema), async (req: Request, res: Response) => {
+  if (!requireProjectAdmin(req, res)) return;
+
   const { provider, token, repoName, isPrivate } = req.body;
   const projectId = req.project!.id;
 
@@ -117,6 +130,8 @@ router.post('/create-repo', validate(createRepoSchema), async (req: Request, res
 
 // POST /api/projects/:id/setup/configure-deploy
 router.post('/configure-deploy', async (req: Request, res: Response) => {
+  if (!requireProjectAdmin(req, res)) return;
+
   const cfApiToken = process.env.CF_API_TOKEN;
   const cfAccountId = process.env.CF_ACCOUNT_ID;
   if (!cfApiToken || !cfAccountId) {
@@ -174,6 +189,8 @@ router.post('/configure-deploy', async (req: Request, res: Response) => {
 
 // POST /api/projects/:id/setup/skip-deploy
 router.post('/skip-deploy', (req: Request, res: Response) => {
+  if (!requireProjectAdmin(req, res)) return;
+
   const projectId = req.project!.id;
   repo.updateProjectSetup(projectId, true);
   repo.insertAuditLog(req.user!.userId, req.user!.email, 'setup_skip_deploy', 'project', projectId);

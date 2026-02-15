@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import Header from './components/layout/Header';
 import NotificationToast from './components/layout/NotificationToast';
 import FileLockBanner from './components/board/FileLockBanner';
@@ -123,12 +123,17 @@ function Dashboard() {
   }, []);
 
   const { cursors, presence, sendCursorMove, sendCursorLeave } = useCursors();
-  const { tickets, fetchTickets, resetAndFetch, create, remove, launch, approve, reject, retry, rollback, updateTicketInState, insertLocalTicket, removeLocalTicket, reorder } = useTickets();
+  const { tickets, fetchTickets, resetAndFetch, create, remove, launch, approve, reject, retry, rollback, updateTicketInState, insertLocalTicket, removeLocalTicket, reorder, clearTickets } = useTickets();
   const { notifications, addNotification, removeNotification } = useNotifications(appConfig.notification_timeout_ms);
   const { on, off, emit } = useSocket();
   const { t } = useLanguage();
   const { aiDesign } = useAIDesign();
   const { currentProject, loading: projectsLoading } = useProject();
+
+  // Clear tickets visually on logout
+  useEffect(() => {
+    if (!user) clearTickets();
+  }, [user, clearTickets]);
 
   // Refetch tickets when project changes (with loading state)
   useEffect(() => {
@@ -202,7 +207,7 @@ function Dashboard() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleLaunch = async (id: number) => {
-    if (!user) { openLogin(); return; }
+    if (!user || user.isVisitor) { openLogin(); return; }
     try {
       // Check if project is configured
       const status = await getSetupStatus();
@@ -344,7 +349,7 @@ function Dashboard() {
         ) : viewMode === 'timeline' ? (
           <TimelineView tickets={filteredTickets} onTicketClick={handleTicketClick} />
         ) : viewMode === 'board' ? (
-          <KanbanBoard tickets={filteredTickets} onTicketClick={handleTicketClick} onLaunch={handleLaunch} onCreateClick={() => { if (!user) { openLogin(); return; } setShowCreate(true); }} onReorder={reorder} hideEmptyCTA={showOnboarding} />
+          <KanbanBoard tickets={filteredTickets} onTicketClick={handleTicketClick} onLaunch={handleLaunch} onCreateClick={() => { if (!user || user.isVisitor) { openLogin(); return; } setShowCreate(true); }} onReorder={reorder} hideEmptyCTA={showOnboarding} />
         ) : (
           <ListView tickets={filteredTickets} onTicketClick={handleTicketClick} scoreThresholdGood={appConfig.score_threshold_good} scoreThresholdOk={appConfig.score_threshold_ok} />
         )}
@@ -382,7 +387,7 @@ function Dashboard() {
           tickets={tickets}
           onSelect={handleTicketClick}
           onClose={() => setShowCmd(false)}
-          onCreate={() => setShowCreate(true)}
+          onCreate={() => { if (!user || user.isVisitor) { openLogin(); return; } setShowCreate(true); }}
         />
       )}
 
@@ -428,8 +433,17 @@ function DashboardWithAuth() {
     closeLogin();
   };
 
-  // Show modal: on first load if not auth'd (until dismissed), or when triggered by action
-  const showModal = !user && (showLogin || !dismissed);
+  // Close login modal when user changes (e.g. visitor clicks "Nouveau client")
+  const prevUserIdRef = useRef(user?.id);
+  useEffect(() => {
+    if (user && user.id !== prevUserIdRef.current) {
+      closeLogin();
+    }
+    prevUserIdRef.current = user?.id;
+  }, [user?.id, closeLogin]);
+
+  // Show modal: on first load if not auth'd (until dismissed), or when triggered by action (including visitors)
+  const showModal = (!user && (showLogin || !dismissed)) || (user?.isVisitor && showLogin);
 
   if (loading) {
     return (
@@ -456,9 +470,8 @@ function DashboardWithAuth() {
 }
 
 function AppRoutes() {
-  const location = useLocation();
   return (
-    <Routes location={location} key={location.pathname}>
+    <Routes>
       <Route path="/" element={<PublicLayout><LandingPage /></PublicLayout>} />
       <Route path="/pricing" element={<PublicLayout><PricingPage /></PublicLayout>} />
       <Route path="/contact" element={<PublicLayout><ContactPage /></PublicLayout>} />

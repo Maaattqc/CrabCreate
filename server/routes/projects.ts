@@ -112,9 +112,19 @@ router.post('/:id/invite', requireProject, requireProjectRole('admin'), validate
 // PUT /api/projects/:id/members/:userId/role — change role
 router.put('/:id/members/:userId/role', requireProject, validate(changeMemberRoleSchema), (req: Request, res: Response) => {
   const targetUserId = Number(req.params.userId);
+  if (isNaN(targetUserId) || targetUserId <= 0) {
+    res.status(400).json({ error: 'Invalid user ID' });
+    return;
+  }
   const { role: newRole } = req.body;
   const projectId = req.project!.id;
   const callerRole = req.project!.userRole;
+
+  // Cannot change your own role
+  if (req.user!.userId === targetUserId) {
+    res.status(403).json({ error: 'Cannot change your own role' });
+    return;
+  }
 
   const targetMember = repo.findProjectMember(projectId, targetUserId);
   if (!targetMember) {
@@ -218,6 +228,11 @@ router.get('/:id/invitations', requireProject, requireProjectRole('admin'), (req
 // DELETE /api/projects/:id/invitations/:invId — cancel invitation (admin+)
 router.delete('/:id/invitations/:invId', requireProject, requireProjectRole('admin'), (req: Request, res: Response) => {
   const invId = Number(req.params.invId);
+  const invitation = repo.findInvitationById(invId);
+  if (!invitation || invitation.project_id !== req.project!.id) {
+    res.status(404).json({ error: 'Invitation not found' });
+    return;
+  }
   repo.deleteInvitation(invId);
   res.json({ success: true });
 });

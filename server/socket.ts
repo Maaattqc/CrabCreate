@@ -64,6 +64,17 @@ function getPresenceList(projectId: number): { userId: number; email: string }[]
   return Array.from(seen.values());
 }
 
+function canAccessProject(userId: number, projectId: number): boolean {
+  const member = repo.findProjectMember(projectId, userId);
+  if (member) return true;
+  const user = repo.findUserById(userId);
+  return !!user && user.is_admin === 1;
+}
+
+function isInProjectRoom(socket: { rooms: Set<string> }, projectId: number): boolean {
+  return socket.rooms.has(`project:${projectId}`);
+}
+
 function initSocket(httpServer: http.Server): Server {
   io = new Server(httpServer, {
     cors: {
@@ -104,9 +115,11 @@ function initSocket(httpServer: http.Server): Server {
       }
     }
 
-    // Client can switch projects — join/leave rooms
+    // Client can switch projects — join/leave rooms (with membership check)
     socket.on('project:join', (projectId: number) => {
       if (!userId) return;
+      if (!Number.isInteger(projectId) || projectId <= 0) return;
+      if (!canAccessProject(userId, projectId)) return;
       socket.join(`project:${projectId}`);
       addToPresence(projectId, socket.id, userId, email);
       io!.to(`project:${projectId}`).emit('presence:sync', { projectId, users: getPresenceList(projectId) });
@@ -123,6 +136,9 @@ function initSocket(httpServer: http.Server): Server {
     // ── Cursor relay ──────────────────────────────────────────────────────────
     socket.on('cursor:move', (data: { x: number; y: number; projectId: number }) => {
       if (!userId) return;
+      if (!Number.isInteger(data.projectId) || data.projectId <= 0) return;
+      if (!isInProjectRoom(socket, data.projectId)) return;
+      if (!canAccessProject(userId, data.projectId)) return;
       socket.to(`project:${data.projectId}`).emit('cursor:update', {
         projectId: data.projectId,
         userId,
@@ -134,12 +150,20 @@ function initSocket(httpServer: http.Server): Server {
 
     socket.on('cursor:leave', (data: { projectId: number }) => {
       if (!userId) return;
+      if (!Number.isInteger(data.projectId) || data.projectId <= 0) return;
+      if (!isInProjectRoom(socket, data.projectId)) return;
+      if (!canAccessProject(userId, data.projectId)) return;
       socket.to(`project:${data.projectId}`).emit('cursor:remove', { projectId: data.projectId, userId });
     });
 
     // ── Ticket viewing ──────────────────────────────────────────────────────
     socket.on('ticket:view', (data: { ticketId: number; projectId: number }) => {
       if (!userId) return;
+      if (!Number.isInteger(data.projectId) || data.projectId <= 0) return;
+      if (!Number.isInteger(data.ticketId) || data.ticketId <= 0) return;
+      if (!isInProjectRoom(socket, data.projectId)) return;
+      if (!canAccessProject(userId, data.projectId)) return;
+      if (!repo.isTicketInProject(data.ticketId, data.projectId)) return;
       if (!ticketViewersMap.has(data.ticketId)) ticketViewersMap.set(data.ticketId, new Map());
       ticketViewersMap.get(data.ticketId)!.set(socket.id, { userId, email });
       const viewers = Array.from(ticketViewersMap.get(data.ticketId)!.values());
@@ -154,6 +178,11 @@ function initSocket(httpServer: http.Server): Server {
 
     socket.on('ticket:unview', (data: { ticketId: number; projectId: number }) => {
       if (!userId) return;
+      if (!Number.isInteger(data.projectId) || data.projectId <= 0) return;
+      if (!Number.isInteger(data.ticketId) || data.ticketId <= 0) return;
+      if (!isInProjectRoom(socket, data.projectId)) return;
+      if (!canAccessProject(userId, data.projectId)) return;
+      if (!repo.isTicketInProject(data.ticketId, data.projectId)) return;
       const map = ticketViewersMap.get(data.ticketId);
       if (map) {
         map.delete(socket.id);
@@ -172,6 +201,11 @@ function initSocket(httpServer: http.Server): Server {
     // ── Typing indicator ────────────────────────────────────────────────────
     socket.on('ticket:typing', (data: { ticketId: number; projectId: number }) => {
       if (!userId) return;
+      if (!Number.isInteger(data.projectId) || data.projectId <= 0) return;
+      if (!Number.isInteger(data.ticketId) || data.ticketId <= 0) return;
+      if (!isInProjectRoom(socket, data.projectId)) return;
+      if (!canAccessProject(userId, data.projectId)) return;
+      if (!repo.isTicketInProject(data.ticketId, data.projectId)) return;
       socket.to(`project:${data.projectId}`).emit('ticket:typing', {
         ticketId: data.ticketId,
         userId,
@@ -181,6 +215,11 @@ function initSocket(httpServer: http.Server): Server {
 
     socket.on('ticket:stop-typing', (data: { ticketId: number; projectId: number }) => {
       if (!userId) return;
+      if (!Number.isInteger(data.projectId) || data.projectId <= 0) return;
+      if (!Number.isInteger(data.ticketId) || data.ticketId <= 0) return;
+      if (!isInProjectRoom(socket, data.projectId)) return;
+      if (!canAccessProject(userId, data.projectId)) return;
+      if (!repo.isTicketInProject(data.ticketId, data.projectId)) return;
       socket.to(`project:${data.projectId}`).emit('ticket:stop-typing', {
         ticketId: data.ticketId,
         userId,
@@ -190,6 +229,11 @@ function initSocket(httpServer: http.Server): Server {
     // ── Editing lock (per-field) ─────────────────────────────────────────────
     socket.on('ticket:editing', (data: { ticketId: number; projectId: number; field: string }) => {
       if (!userId || !data.field) return;
+      if (!Number.isInteger(data.projectId) || data.projectId <= 0) return;
+      if (!Number.isInteger(data.ticketId) || data.ticketId <= 0) return;
+      if (!isInProjectRoom(socket, data.projectId)) return;
+      if (!canAccessProject(userId, data.projectId)) return;
+      if (!repo.isTicketInProject(data.ticketId, data.projectId)) return;
       const key = `${data.ticketId}:${data.field}`;
       ticketEditingMap.set(key, { socketId: socket.id, userId, email });
       socket.to(`project:${data.projectId}`).emit('ticket:editing', {
@@ -202,6 +246,11 @@ function initSocket(httpServer: http.Server): Server {
 
     socket.on('ticket:stop-editing', (data: { ticketId: number; projectId: number; field: string }) => {
       if (!userId || !data.field) return;
+      if (!Number.isInteger(data.projectId) || data.projectId <= 0) return;
+      if (!Number.isInteger(data.ticketId) || data.ticketId <= 0) return;
+      if (!isInProjectRoom(socket, data.projectId)) return;
+      if (!canAccessProject(userId, data.projectId)) return;
+      if (!repo.isTicketInProject(data.ticketId, data.projectId)) return;
       const key = `${data.ticketId}:${data.field}`;
       const current = ticketEditingMap.get(key);
       if (current && current.userId === userId) {
@@ -234,6 +283,11 @@ function initSocket(httpServer: http.Server): Server {
     // ── Drag awareness ──────────────────────────────────────────────────────
     socket.on('ticket:drag-start', (data: { ticketId: number; projectId: number }) => {
       if (!userId) return;
+      if (!Number.isInteger(data.projectId) || data.projectId <= 0) return;
+      if (!Number.isInteger(data.ticketId) || data.ticketId <= 0) return;
+      if (!isInProjectRoom(socket, data.projectId)) return;
+      if (!canAccessProject(userId, data.projectId)) return;
+      if (!repo.isTicketInProject(data.ticketId, data.projectId)) return;
       ticketDraggingMap.set(data.ticketId, { userId, email });
       socket.to(`project:${data.projectId}`).emit('ticket:drag-start', {
         ticketId: data.ticketId,
@@ -244,6 +298,11 @@ function initSocket(httpServer: http.Server): Server {
 
     socket.on('ticket:drag-end', (data: { ticketId: number; projectId: number }) => {
       if (!userId) return;
+      if (!Number.isInteger(data.projectId) || data.projectId <= 0) return;
+      if (!Number.isInteger(data.ticketId) || data.ticketId <= 0) return;
+      if (!isInProjectRoom(socket, data.projectId)) return;
+      if (!canAccessProject(userId, data.projectId)) return;
+      if (!repo.isTicketInProject(data.ticketId, data.projectId)) return;
       ticketDraggingMap.delete(data.ticketId);
       socket.to(`project:${data.projectId}`).emit('ticket:drag-end', {
         ticketId: data.ticketId,
@@ -267,13 +326,13 @@ function initSocket(httpServer: http.Server): Server {
       for (const [ticketId, map] of ticketViewersMap) {
         if (map.has(socket.id)) {
           map.delete(socket.id);
-          // Broadcast updated viewers to all project rooms
+          // Broadcast updated viewers to the ticket's project only
           const viewers = map.size > 0 ? Array.from(map.values()) : [];
           const seen = new Map<number, { userId: number; email: string }>();
           for (const v of viewers) { if (!seen.has(v.userId)) seen.set(v.userId, v); }
-          // Find which project this ticket belongs to by checking socket rooms
-          for (const [projectId] of presenceMap) {
-            io!.to(`project:${projectId}`).emit('ticket:viewers', {
+          const ticket = repo.findTicketById(ticketId);
+          if (ticket?.project_id) {
+            io!.to(`project:${ticket.project_id}`).emit('ticket:viewers', {
               ticketId,
               viewers: Array.from(seen.values()),
             });
@@ -286,8 +345,10 @@ function initSocket(httpServer: http.Server): Server {
         if (editor.socketId === socket.id) {
           ticketEditingMap.delete(key);
           const [ticketIdStr, field] = key.split(':');
-          for (const [projectId] of presenceMap) {
-            io!.to(`project:${projectId}`).emit('ticket:stop-editing', { ticketId: Number(ticketIdStr), field, userId });
+          const ticketId = Number(ticketIdStr);
+          const ticket = repo.findTicketById(ticketId);
+          if (ticket?.project_id) {
+            io!.to(`project:${ticket.project_id}`).emit('ticket:stop-editing', { ticketId, field, userId });
           }
         }
       }
@@ -295,8 +356,9 @@ function initSocket(httpServer: http.Server): Server {
       for (const [ticketId, dragger] of ticketDraggingMap) {
         if (dragger.userId === userId) {
           ticketDraggingMap.delete(ticketId);
-          for (const [projectId] of presenceMap) {
-            io!.to(`project:${projectId}`).emit('ticket:drag-end', { ticketId, userId });
+          const ticket = repo.findTicketById(ticketId);
+          if (ticket?.project_id) {
+            io!.to(`project:${ticket.project_id}`).emit('ticket:drag-end', { ticketId, userId });
           }
         }
       }
@@ -316,44 +378,35 @@ function getIO(): Server {
 function emitTicketLog(ticketId: number, message: string, logType: string = 'info', phase: string = '', projectId?: number): void {
   if (io) {
     const payload = { ticketId, message, logType, phase };
-    if (projectId) {
-      io.to(`project:${projectId}`).emit('ticket:log', payload);
-    } else {
-      io.emit('ticket:log', payload);
-    }
+    const resolvedProjectId = projectId ?? repo.findTicketById(ticketId)?.project_id;
+    if (!resolvedProjectId) return;
+    io.to(`project:${resolvedProjectId}`).emit('ticket:log', payload);
   }
 }
 
 function emitTicketStatus(ticketId: number, status: string, progress: number = 0, projectId?: number): void {
   if (io) {
     const payload = { ticketId, status, progress };
-    if (projectId) {
-      io.to(`project:${projectId}`).emit('ticket:status', payload);
-    } else {
-      io.emit('ticket:status', payload);
-    }
+    const resolvedProjectId = projectId ?? repo.findTicketById(ticketId)?.project_id;
+    if (!resolvedProjectId) return;
+    io.to(`project:${resolvedProjectId}`).emit('ticket:status', payload);
   }
 }
 
 function emitTicketUpdated(ticketId: number, fields: Record<string, any>, projectId?: number): void {
   if (io) {
     const payload = { ticketId, ...fields };
-    if (projectId) {
-      io.to(`project:${projectId}`).emit('ticket:updated', payload);
-    } else {
-      io.emit('ticket:updated', payload);
-    }
+    const resolvedProjectId = projectId ?? repo.findTicketById(ticketId)?.project_id;
+    if (!resolvedProjectId) return;
+    io.to(`project:${resolvedProjectId}`).emit('ticket:updated', payload);
   }
 }
 
 function emitNotification(message: string, type: string = 'info', projectId?: number): void {
   if (io) {
     const payload = { message, type };
-    if (projectId) {
-      io.to(`project:${projectId}`).emit('notification', payload);
-    } else {
-      io.emit('notification', payload);
-    }
+    if (!projectId) return;
+    io.to(`project:${projectId}`).emit('notification', payload);
   }
 }
 

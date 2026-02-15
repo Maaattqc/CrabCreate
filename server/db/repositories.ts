@@ -1,4 +1,15 @@
 import db from './sqlite';
+import {
+  authCodeMatches,
+  decryptSecret,
+  encryptSecret,
+  hashAuthCode,
+} from '../services/secrets';
+
+/** Escape LIKE wildcard characters in user input */
+function escapeLike(str: string): string {
+  return str.replace(/[%_\\]/g, '\\$&');
+}
 import type {
   Ticket,
   LogEntry,
@@ -83,12 +94,12 @@ export function findAllTickets(filters: Record<string, string>, userId?: number,
     params.push(filters.assignee);
   }
   if (filters.tag) {
-    sql += ' AND t.tags LIKE ?';
-    params.push(`%${filters.tag}%`);
+    sql += " AND t.tags LIKE ? ESCAPE '\\'";
+    params.push(`%${escapeLike(filters.tag)}%`);
   }
   if (filters.search) {
-    sql += ' AND (t.title LIKE ? OR t.description LIKE ?)';
-    params.push(`%${filters.search}%`, `%${filters.search}%`);
+    sql += " AND (t.title LIKE ? ESCAPE '\\' OR t.description LIKE ? ESCAPE '\\')";
+    params.push(`%${escapeLike(filters.search)}%`, `%${escapeLike(filters.search)}%`);
   }
 
   sql += ' ORDER BY t.position ASC, t.created_at DESC';
@@ -167,8 +178,9 @@ export function updateTicket(id: number, fields: Record<string, any>, modifiedBy
   const updates: string[] = [];
   const values: any[] = [];
 
+  const ALLOWED_SET = new Set(allowedFields);
   for (const field of allowedFields) {
-    if (fields[field] !== undefined) {
+    if (fields[field] !== undefined && ALLOWED_SET.has(field) && /^[a-z_]+$/.test(field)) {
       updates.push(`${field} = ?`);
       const val = fields[field];
       values.push(typeof val === 'object' ? JSON.stringify(val) : val);
@@ -208,7 +220,7 @@ export function updateTicketFields(id: number, fields: Record<string, any>): voi
   const values: any[] = [];
 
   for (const [key, val] of Object.entries(fields)) {
-    if (!TICKET_UPDATABLE_FIELDS.has(key)) continue;
+    if (!TICKET_UPDATABLE_FIELDS.has(key) || !/^[a-z_]+$/.test(key)) continue;
     updates.push(`${key} = ?`);
     values.push(typeof val === 'object' && val !== null ? JSON.stringify(val) : val);
   }
@@ -308,11 +320,22 @@ export function setConfig(key: string, value: string): void {
 // ── Repos ────────────────────────────────────────────────────────────────────
 
 export function findAllRepos(): Repo[] {
-  return db.prepare('SELECT * FROM kanban_repos').all() as Repo[];
+  const repos = db.prepare('SELECT * FROM kanban_repos').all() as Repo[];
+  return repos.map(r => ({
+    ...r,
+    provider_token: decryptSecret(r.provider_token),
+    clone_url: decryptSecret(r.clone_url),
+  }));
 }
 
 export function findRepoById(id: string): Repo | undefined {
-  return db.prepare('SELECT * FROM kanban_repos WHERE id = ?').get(id) as Repo | undefined;
+  const repo = db.prepare('SELECT * FROM kanban_repos WHERE id = ?').get(id) as Repo | undefined;
+  if (!repo) return undefined;
+  return {
+    ...repo,
+    provider_token: decryptSecret(repo.provider_token),
+    clone_url: decryptSecret(repo.clone_url),
+  };
 }
 
 // ── Analytics ────────────────────────────────────────────────────────────────
@@ -400,15 +423,34 @@ export function updateUserLastLogin(id: number): void {
   db.prepare("UPDATE auth_users SET last_login_at = datetime('now') WHERE id = ?").run(id);
 }
 
+export function invalidateUserTokens(id: number): void {
+  db.prepare("UPDATE auth_users SET token_invalidated_at = datetime('now') WHERE id = ?").run(id);
+}
+
+export function clearTokenInvalidation(id: number): void {
+  db.prepare("UPDATE auth_users SET token_invalidated_at = NULL WHERE id = ?").run(id);
+}
+
+export function getUserTokenInvalidatedAt(id: number): string | null {
+  const row = db.prepare('SELECT token_invalidated_at FROM auth_users WHERE id = ?').get(id) as { token_invalidated_at: string | null } | undefined;
+  return row?.token_invalidated_at || null;
+}
+
 export function createAuthCode(email: string, code: string, expiresAt: string): AuthCode {
-  const result = db.prepare('INSERT INTO auth_codes (email, code, expires_at) VALUES (?, ?, ?)').run(email, code, expiresAt);
+  const hashed = hashAuthCode(code);
+  const result = db.prepare('INSERT INTO auth_codes (email, code, expires_at) VALUES (?, ?, ?)').run(email, hashed, expiresAt);
   return db.prepare('SELECT * FROM auth_codes WHERE id = ?').get(result.lastInsertRowid) as AuthCode;
 }
 
 export function findValidAuthCode(email: string, code: string): AuthCode | undefined {
+  const hashed = hashAuthCode(code);
   return db.prepare(
-    "SELECT * FROM auth_codes WHERE email = ? AND code = ? AND used = 0 AND attempts < 5 AND expires_at > datetime('now') ORDER BY created_at DESC LIMIT 1"
-  ).get(email, code) as AuthCode | undefined;
+    "SELECT * FROM auth_codes WHERE email = ? AND code IN (?, ?) AND used = 0 AND attempts < 5 AND expires_at > datetime('now') ORDER BY created_at DESC LIMIT 1"
+  ).get(email, code, hashed) as AuthCode | undefined;
+}
+
+export function isAuthCodeMatch(storedCode: string, providedCode: string): boolean {
+  return authCodeMatches(storedCode, providedCode);
 }
 
 export function incrementAuthCodeAttempts(id: number): void {
@@ -464,15 +506,25 @@ export function updateUserPlan(id: number, plan: string): void {
 }
 
 export function updateUserStripeCustomerId(id: number, stripeCustomerId: string): void {
-  db.prepare('UPDATE auth_users SET stripe_customer_id = ? WHERE id = ?').run(stripeCustomerId, id);
+  db.prepare('UPDATE auth_users SET stripe_customer_id = ? WHERE id = ?').run(encryptSecret(stripeCustomerId), id);
 }
 
 export function updateUserStripeSubscription(id: number, subscriptionId: string | null, subscriptionStatus: string | null): void {
-  db.prepare('UPDATE auth_users SET stripe_subscription_id = ?, stripe_subscription_status = ? WHERE id = ?').run(subscriptionId, subscriptionStatus, id);
+  db.prepare('UPDATE auth_users SET stripe_subscription_id = ?, stripe_subscription_status = ? WHERE id = ?').run(
+    subscriptionId ? encryptSecret(subscriptionId) : null,
+    subscriptionStatus,
+    id,
+  );
 }
 
 export function findUserByStripeCustomerId(stripeCustomerId: string): AuthUser | undefined {
-  return db.prepare('SELECT * FROM auth_users WHERE stripe_customer_id = ?').get(stripeCustomerId) as AuthUser | undefined;
+  // Search both encrypted and plaintext (backward compat during migration)
+  const encrypted = encryptSecret(stripeCustomerId);
+  const users = db.prepare('SELECT * FROM auth_users WHERE stripe_customer_id IS NOT NULL').all() as AuthUser[];
+  return users.find(u => {
+    const decrypted = decryptSecret(u.stripe_customer_id);
+    return decrypted === stripeCustomerId || u.stripe_customer_id === stripeCustomerId;
+  });
 }
 
 export function countUserTicketsThisMonth(userId: number, projectId: number): number {
@@ -487,6 +539,10 @@ export function countUserActivePipelines(userId: number, projectId: number): num
     "SELECT COUNT(*) as count FROM kanban_tickets WHERE user_id = ? AND project_id = ? AND status IN ('estimating', 'ai_coding', 'ai_review', 'testing', 'deploying')"
   ).get(userId, projectId) as CountResult;
   return row.count;
+}
+
+export function createContactMessage(name: string, email: string, message: string, ip: string): void {
+  db.prepare('INSERT INTO kanban_contact_messages (name, email, message, ip) VALUES (?, ?, ?, ?)').run(name, email, message, ip);
 }
 
 export function findAllContactMessages(): ContactMessage[] {
@@ -683,6 +739,10 @@ export function createInvitation(projectId: number, email: string, role: Project
 
 export function findInvitationByToken(token: string): ProjectInvitation | undefined {
   return db.prepare('SELECT * FROM kanban_project_invitations WHERE token = ?').get(token) as ProjectInvitation | undefined;
+}
+
+export function findInvitationById(id: number): ProjectInvitation | undefined {
+  return db.prepare('SELECT * FROM kanban_project_invitations WHERE id = ?').get(id) as ProjectInvitation | undefined;
 }
 
 export function findPendingInvitationsByEmail(email: string): ProjectInvitationWithProject[] {
@@ -1116,11 +1176,11 @@ export function createTemplate(projectId: number, data: { name: string; title_te
 }
 
 export function updateTemplate(id: number, fields: Record<string, any>): TicketTemplate | undefined {
-  const allowed = ['name', 'title_template', 'description_template', 'priority', 'template', 'tags'];
+  const allowed = new Set(['name', 'title_template', 'description_template', 'priority', 'template', 'tags']);
   const updates: string[] = [];
   const values: any[] = [];
   for (const key of allowed) {
-    if (fields[key] !== undefined) {
+    if (fields[key] !== undefined && /^[a-z_]+$/.test(key)) {
       updates.push(`${key} = ?`);
       values.push(key === 'tags' ? JSON.stringify(fields[key]) : fields[key]);
     }
@@ -1153,11 +1213,11 @@ export function createUserWebhook(projectId: number, data: { url: string; events
 }
 
 export function updateUserWebhook(id: number, fields: Record<string, any>): UserWebhook | undefined {
-  const allowed = ['url', 'events', 'enabled', 'secret'];
+  const allowed = new Set(['url', 'events', 'enabled', 'secret']);
   const updates: string[] = [];
   const values: any[] = [];
   for (const key of allowed) {
-    if (fields[key] !== undefined) {
+    if (fields[key] !== undefined && /^[a-z_]+$/.test(key)) {
       updates.push(`${key} = ?`);
       values.push(key === 'events' ? JSON.stringify(fields[key]) : fields[key]);
     }
@@ -1181,14 +1241,14 @@ export function findUserWebhooksByEvent(projectId: number, event: string): UserW
 // ── Global Search ───────────────────────────────────────────────────────────
 
 export function globalSearch(projectId: number, query: string): SearchResult[] {
-  const pattern = `%${query}%`;
+  const pattern = `%${escapeLike(query)}%`;
   const results: SearchResult[] = [];
 
   // Search tickets
   const tickets = db.prepare(`
     SELECT id, id as ticket_id, title, COALESCE(description, '') as snippet, created_at
     FROM kanban_tickets
-    WHERE project_id = ? AND (title LIKE ? OR description LIKE ?)
+    WHERE project_id = ? AND (title LIKE ? ESCAPE '\\' OR description LIKE ? ESCAPE '\\')
     ORDER BY updated_at DESC LIMIT 20
   `).all(projectId, pattern, pattern) as any[];
   for (const t of tickets) {
@@ -1200,7 +1260,7 @@ export function globalSearch(projectId: number, query: string): SearchResult[] {
     SELECT c.id, c.ticket_id, t.title, c.content as snippet, c.created_at
     FROM kanban_comments c
     INNER JOIN kanban_tickets t ON c.ticket_id = t.id
-    WHERE t.project_id = ? AND c.content LIKE ?
+    WHERE t.project_id = ? AND c.content LIKE ? ESCAPE '\\'
     ORDER BY c.created_at DESC LIMIT 10
   `).all(projectId, pattern) as any[];
   for (const c of comments) {
@@ -1212,7 +1272,7 @@ export function globalSearch(projectId: number, query: string): SearchResult[] {
     SELECT a.id, a.ticket_id, COALESCE(t.title, '') as title, a.message as snippet, a.created_at
     FROM kanban_activity a
     LEFT JOIN kanban_tickets t ON a.ticket_id = t.id
-    WHERE t.project_id = ? AND a.message LIKE ?
+    WHERE t.project_id = ? AND a.message LIKE ? ESCAPE '\\'
     ORDER BY a.created_at DESC LIMIT 10
   `).all(projectId, pattern) as any[];
   for (const a of activities) {
@@ -1225,22 +1285,28 @@ export function globalSearch(projectId: number, query: string): SearchResult[] {
 // ── Deploy Configs ──────────────────────────────────────────────────────────
 
 export function findDeployConfigByProject(projectId: number): DeployConfig | undefined {
-  return db.prepare('SELECT * FROM kanban_deploy_configs WHERE project_id = ?').get(projectId) as DeployConfig | undefined;
+  const cfg = db.prepare('SELECT * FROM kanban_deploy_configs WHERE project_id = ?').get(projectId) as DeployConfig | undefined;
+  if (!cfg) return undefined;
+  return {
+    ...cfg,
+    cf_api_token: decryptSecret(cfg.cf_api_token),
+  };
 }
 
 export function createDeployConfig(projectId: number, data: Partial<DeployConfig>): DeployConfig {
-  const result = db.prepare(
+  const encryptedCfApiToken = data.cf_api_token ? encryptSecret(data.cf_api_token) : null;
+  db.prepare(
     'INSERT INTO kanban_deploy_configs (project_id, cf_project_name, cf_site_url, cf_api_token, cf_account_id, supabase_tenant_id, custom_domain) VALUES (?, ?, ?, ?, ?, ?, ?)'
   ).run(
     projectId,
     data.cf_project_name || null,
     data.cf_site_url || null,
-    data.cf_api_token || null,
+    encryptedCfApiToken,
     data.cf_account_id || null,
     data.supabase_tenant_id || null,
     data.custom_domain || null,
   );
-  return db.prepare('SELECT * FROM kanban_deploy_configs WHERE id = ?').get(result.lastInsertRowid) as DeployConfig;
+  return findDeployConfigByProject(projectId)!;
 }
 
 export function updateDeployConfig(projectId: number, data: Partial<DeployConfig>): void {
@@ -1249,7 +1315,7 @@ export function updateDeployConfig(projectId: number, data: Partial<DeployConfig
 
   if (data.cf_project_name !== undefined) { updates.push('cf_project_name = ?'); values.push(data.cf_project_name); }
   if (data.cf_site_url !== undefined) { updates.push('cf_site_url = ?'); values.push(data.cf_site_url); }
-  if (data.cf_api_token !== undefined) { updates.push('cf_api_token = ?'); values.push(data.cf_api_token); }
+  if (data.cf_api_token !== undefined) { updates.push('cf_api_token = ?'); values.push(data.cf_api_token ? encryptSecret(data.cf_api_token) : null); }
   if (data.cf_account_id !== undefined) { updates.push('cf_account_id = ?'); values.push(data.cf_account_id); }
   if (data.supabase_tenant_id !== undefined) { updates.push('supabase_tenant_id = ?'); values.push(data.supabase_tenant_id); }
   if (data.custom_domain !== undefined) { updates.push('custom_domain = ?'); values.push(data.custom_domain); }
@@ -1261,6 +1327,18 @@ export function updateDeployConfig(projectId: number, data: Partial<DeployConfig
 
 export function updateProjectSetup(projectId: number, completed: boolean): void {
   db.prepare("UPDATE kanban_projects SET setup_completed = ?, updated_at = datetime('now') WHERE id = ?").run(completed ? 1 : 0, projectId);
+}
+
+function sanitizeRepoUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  try {
+    const parsed = new URL(url);
+    parsed.username = '';
+    parsed.password = '';
+    return parsed.toString();
+  } catch {
+    return null;
+  }
 }
 
 export function getProjectSetupStatus(projectId: number): ProjectSetupStatus {
@@ -1279,7 +1357,7 @@ export function getProjectSetupStatus(projectId: number): ProjectSetupStatus {
     repoConfigured,
     deployConfigured,
     gitProvider: repo?.git_provider || null,
-    repoUrl: repo?.clone_url || null,
+    repoUrl: sanitizeRepoUrl(repo?.clone_url),
     cfSiteUrl: deploy?.cf_site_url || null,
   };
 }
@@ -1297,13 +1375,13 @@ export function createOrUpdateRepo(id: string, data: Partial<Repo>): Repo {
     if (data.git_provider !== undefined) { updates.push('git_provider = ?'); values.push(data.git_provider); }
     if (data.provider_owner !== undefined) { updates.push('provider_owner = ?'); values.push(data.provider_owner); }
     if (data.provider_repo !== undefined) { updates.push('provider_repo = ?'); values.push(data.provider_repo); }
-    if (data.provider_token !== undefined) { updates.push('provider_token = ?'); values.push(data.provider_token); }
-    if (data.clone_url !== undefined) { updates.push('clone_url = ?'); values.push(data.clone_url); }
+    if (data.provider_token !== undefined) { updates.push('provider_token = ?'); values.push(data.provider_token ? encryptSecret(data.provider_token) : ''); }
+    if (data.clone_url !== undefined) { updates.push('clone_url = ?'); values.push(data.clone_url ? encryptSecret(data.clone_url) : ''); }
     if (updates.length > 0) {
       values.push(id);
       db.prepare(`UPDATE kanban_repos SET ${updates.join(', ')} WHERE id = ?`).run(...values);
     }
-    return db.prepare('SELECT * FROM kanban_repos WHERE id = ?').get(id) as Repo;
+    return findRepoById(id)!;
   }
   db.prepare(
     'INSERT INTO kanban_repos (id, label, bitbucket_workspace, bitbucket_repo_slug, default_branch, git_provider, provider_owner, provider_repo, provider_token, clone_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
@@ -1316,10 +1394,10 @@ export function createOrUpdateRepo(id: string, data: Partial<Repo>): Repo {
     data.git_provider || 'bitbucket',
     data.provider_owner || '',
     data.provider_repo || '',
-    data.provider_token || '',
-    data.clone_url || '',
+    data.provider_token ? encryptSecret(data.provider_token) : '',
+    data.clone_url ? encryptSecret(data.clone_url) : '',
   );
-  return db.prepare('SELECT * FROM kanban_repos WHERE id = ?').get(id) as Repo;
+  return findRepoById(id)!;
 }
 
 // ── Activity (project-scoped) ───────────────────────────────────────────────

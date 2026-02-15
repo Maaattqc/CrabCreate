@@ -1,4 +1,4 @@
-import express, { Request, Response } from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
@@ -43,8 +43,8 @@ import { requireProject } from './middleware/project';
 import { maintenanceGuard } from './middleware/maintenance';
 
 // Validate JWT secret in production
-if (config.nodeEnv === 'production' && (!config.jwtSecret || config.jwtSecret === 'dev-secret-change-me-in-production' || config.jwtSecret.length < 32)) {
-  logger.error('JWT_SECRET must be set to a strong secret (32+ chars) in production. Exiting.');
+if (config.nodeEnv === 'production' && (!config.jwtSecret || config.jwtSecret === 'dev-secret-change-me-in-production' || config.jwtSecret.length < 64)) {
+  logger.error('JWT_SECRET must be set to a strong secret (64+ chars) in production. Exiting.');
   process.exit(1);
 }
 
@@ -52,6 +52,10 @@ if (config.nodeEnv === 'production' && (!config.jwtSecret || config.jwtSecret ==
 migrate();
 
 const app = express();
+
+// Trust proxy setting is environment-driven; default is 0 outside production.
+app.set('trust proxy', config.trustProxy);
+
 const server = http.createServer(app);
 
 // Init Socket.io
@@ -65,8 +69,8 @@ app.use(helmet({
       scriptSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
-      imgSrc: ["'self'", "data:"],
-      connectSrc: ["'self'", "ws:", "wss:"],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'", `ws://${new URL(config.clientUrl).host}`, `wss://${new URL(config.clientUrl).host}`],
     },
   },
   hsts: config.nodeEnv === 'production' ? { maxAge: 31536000, includeSubDomains: true } : false,
@@ -77,10 +81,41 @@ app.use(helmet({
 // Middleware
 app.use(cors({ origin: config.clientUrl, credentials: true }));
 
+// Block direct probes to .env files. For browser navigation, redirect to dashboard.
+const SENSITIVE_ENV_PATH_RE = /(^|\/)\.env(?:\.[^/]+)?(?:\/)?$/i;
+app.use((req: Request, res: Response, next: NextFunction) => {
+  let requestPath = req.path;
+  try {
+    requestPath = decodeURIComponent(req.path);
+  } catch {
+    // Keep raw path if decoding fails
+  }
+
+  if (!SENSITIVE_ENV_PATH_RE.test(requestPath)) {
+    next();
+    return;
+  }
+
+  logger.warn(`[Security] Blocked attempt to access sensitive path: ${requestPath}`);
+
+  const accept = req.headers.accept || '';
+  if (req.method === 'GET' && typeof accept === 'string' && accept.includes('text/html')) {
+    res.redirect(302, '/dashboard');
+    return;
+  }
+
+  res.status(404).json({ error: 'Not found' });
+});
+
 // Stripe webhook — must be before express.json() for raw body signature verification
 app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), stripeWebhookHandler);
 
-app.use(express.json({ limit: '1mb' }));
+app.use(express.json({
+  limit: '1mb',
+  verify: (req, _res, buf) => {
+    (req as Request & { rawBody?: Buffer }).rawBody = Buffer.from(buf);
+  },
+}));
 app.use(cookieParser());
 
 // Rate limiting
@@ -91,7 +126,7 @@ app.get('/health', (_req: Request, res: Response) => {
   try {
     // Quick DB check
     db.prepare('SELECT 1').get();
-    res.json({ status: 'ok', uptime: process.uptime() });
+    res.json({ status: 'ok' });
   } catch {
     res.status(503).json({ status: 'error', message: 'Database unavailable' });
   }
@@ -154,7 +189,7 @@ app.use('/api/chat', requireProject, chatRouter);
 app.use('/api/comments', requireProject, commentsRouter);
 app.use('/api/tickets', requireProject, subtasksRouter);
 app.use('/api/labels', requireProject, labelsRouter);
-app.use('/api/favorites', favoritesRouter);
+app.use('/api/favorites', requireProject, favoritesRouter);
 app.use('/api/templates', requireProject, templatesRouter);
 app.use('/api/user-webhooks', requireProject, userWebhooksRouter);
 app.use('/api/search', requireProject, searchRouter);
@@ -173,9 +208,19 @@ app.get('/api/file-locks', requireProject, (req: Request, res: Response) => {
   res.json(locks);
 });
 
-app.get('/api/repos', (req: Request, res: Response) => {
-  const repos = repo.findAllRepos();
-  res.json(repos);
+app.get('/api/repos', requireProject, (req: Request, res: Response) => {
+  const project = repo.findProjectById(req.project!.id);
+  if (!project) {
+    res.status(404).json({ error: 'Project not found' });
+    return;
+  }
+
+  const projectRepo = project.default_repo ? repo.findRepoById(project.default_repo) : undefined;
+  const repos = projectRepo ? [projectRepo] : [];
+
+  // Strip sensitive fields — never expose tokens or credentialed clone URLs to the client
+  const safe = repos.map(({ provider_token, clone_url, ...rest }) => rest);
+  res.json(safe);
 });
 
 // Serve React build in production

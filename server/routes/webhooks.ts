@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import crypto from 'crypto';
 import rateLimit from 'express-rate-limit';
 import { emitTicketLog, emitNotification } from '../socket';
 import * as repo from '../db/repositories';
@@ -17,6 +18,39 @@ const webhookLimiter = rateLimit({
 
 // POST /api/webhooks/bitbucket -- Bitbucket webhook handler
 router.post('/bitbucket', webhookLimiter, (req: Request, res: Response) => {
+  // Signature is mandatory. Secret can come from DB config or env.
+  const dbSecret = repo.getConfig('bitbucket_webhook_secret');
+  const envSecret = process.env.BITBUCKET_WEBHOOK_SECRET;
+  const webhookSecret = (dbSecret || envSecret || '').trim();
+  if (!webhookSecret || webhookSecret.length < 16) {
+    logger.error('[Webhook] Bitbucket webhook secret is not configured or too short (min 16 chars)');
+    res.status(503).json({ error: 'Webhook secret not configured' });
+    return;
+  }
+
+  const signature = (req.headers['x-hub-signature-256'] || req.headers['x-hub-signature']) as string | undefined;
+  if (!signature || !signature.startsWith('sha256=')) {
+    logger.warn('[Webhook] Bitbucket request missing valid signature header');
+    res.status(401).json({ error: 'Missing signature' });
+    return;
+  }
+
+  const rawBody = (req as Request & { rawBody?: Buffer }).rawBody;
+  if (!rawBody) {
+    logger.warn('[Webhook] Missing raw body for signature verification');
+    res.status(400).json({ error: 'Invalid request body' });
+    return;
+  }
+
+  const expected = 'sha256=' + crypto.createHmac('sha256', webhookSecret).update(rawBody).digest('hex');
+  const sigBuffer = Buffer.from(signature, 'utf8');
+  const expectedBuffer = Buffer.from(expected, 'utf8');
+  if (sigBuffer.length !== expectedBuffer.length || !crypto.timingSafeEqual(sigBuffer, expectedBuffer)) {
+    logger.warn('[Webhook] Bitbucket signature mismatch');
+    res.status(401).json({ error: 'Invalid signature' });
+    return;
+  }
+
   const event = req.headers['x-event-key'] as string | undefined;
   const payload = req.body;
 
@@ -31,7 +65,7 @@ router.post('/bitbucket', webhookLimiter, (req: Request, res: Response) => {
         if (ticket) {
           emitTicketLog(ticket.id, 'PR mergee via Bitbucket', 'success', 'deploying');
           repo.insertLog(ticket.id, 'PR mergee via Bitbucket', 'success', 'deploying');
-          emitNotification(`PR #${prId} mergee pour ticket #${ticket.id}`, 'success');
+          emitNotification(`PR #${prId} mergee pour ticket #${ticket.id}`, 'success', ticket.project_id ?? undefined);
         }
       }
     } else if (event === 'pullrequest:rejected') {

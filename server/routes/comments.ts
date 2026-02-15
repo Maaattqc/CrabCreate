@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import rateLimit from 'express-rate-limit';
 import * as repo from '../db/repositories';
 import { validate } from '../middleware/validate';
 import { createCommentSchema, updateCommentSchema, toggleReactionSchema } from '../schemas';
@@ -6,6 +7,22 @@ import { hasMinRole } from '../permissions';
 import { emitTicketUpdated } from '../socket';
 
 const router = Router();
+
+const commentWriteLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 20,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'Too many requests. Slow down.' },
+});
+
+const reactionLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 30,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'Too many reactions. Slow down.' },
+});
 
 // GET /api/comments/:ticketId -- List comments for a ticket
 router.get('/:ticketId', (req: Request, res: Response) => {
@@ -30,7 +47,7 @@ router.get('/:ticketId', (req: Request, res: Response) => {
 });
 
 // POST /api/comments/:ticketId -- Create a comment (member+)
-router.post('/:ticketId', validate(createCommentSchema), (req: Request, res: Response) => {
+router.post('/:ticketId', commentWriteLimiter, validate(createCommentSchema), (req: Request, res: Response) => {
   const ticketId = Number(req.params.ticketId);
   if (!repo.isTicketInProject(ticketId, req.project!.id)) {
     return res.status(403).json({ error: 'Access denied' });
@@ -89,6 +106,7 @@ router.put('/:ticketId/:commentId', validate(updateCommentSchema), (req: Request
 
   const existing = repo.findCommentById(commentId);
   if (!existing) return res.status(404).json({ error: 'Comment not found' });
+  if (existing.ticket_id !== ticketId) return res.status(404).json({ error: 'Comment not found' });
   if (existing.user_id !== req.user!.userId && !hasMinRole(req.project!.userRole, 'admin')) {
     return res.status(403).json({ error: 'Cannot edit others\' comments' });
   }
@@ -107,6 +125,7 @@ router.delete('/:ticketId/:commentId', (req: Request, res: Response) => {
 
   const existing = repo.findCommentById(commentId);
   if (!existing) return res.status(404).json({ error: 'Comment not found' });
+  if (existing.ticket_id !== ticketId) return res.status(404).json({ error: 'Comment not found' });
   if (existing.user_id !== req.user!.userId && !hasMinRole(req.project!.userRole, 'admin')) {
     return res.status(403).json({ error: 'Cannot delete others\' comments' });
   }
@@ -117,7 +136,7 @@ router.delete('/:ticketId/:commentId', (req: Request, res: Response) => {
 });
 
 // POST /api/comments/:ticketId/:commentId/react -- Toggle reaction
-router.post('/:ticketId/:commentId/react', validate(toggleReactionSchema), (req: Request, res: Response) => {
+router.post('/:ticketId/:commentId/react', reactionLimiter, validate(toggleReactionSchema), (req: Request, res: Response) => {
   const ticketId = Number(req.params.ticketId);
   const commentId = Number(req.params.commentId);
   if (!repo.isTicketInProject(ticketId, req.project!.id)) {
@@ -129,6 +148,7 @@ router.post('/:ticketId/:commentId/react', validate(toggleReactionSchema), (req:
 
   const comment = repo.findCommentById(commentId);
   if (!comment) return res.status(404).json({ error: 'Comment not found' });
+  if (comment.ticket_id !== ticketId) return res.status(404).json({ error: 'Comment not found' });
 
   const { emoji } = req.body;
   const result = repo.toggleReaction(commentId, req.user!.userId, emoji);

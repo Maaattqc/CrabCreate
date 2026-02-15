@@ -1,5 +1,6 @@
 import axios from 'axios';
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
+import path from 'path';
 import logger from './logger';
 
 const CF_API = 'https://api.cloudflare.com/client/v4';
@@ -44,13 +45,21 @@ export async function deploy(
   distDir: string,
   token: string,
 ): Promise<{ url: string }> {
+  // Validate inputs to prevent injection
+  if (!/^[a-zA-Z0-9_-]+$/.test(projectName)) {
+    throw new Error('Invalid project name');
+  }
+  const resolvedDist = path.resolve(distDir);
+
   try {
-    const output = execSync(
-      `npx wrangler pages deploy "${distDir}" --project-name="${projectName}"`,
+    const output = execFileSync(
+      'npx',
+      ['wrangler', 'pages', 'deploy', resolvedDist, `--project-name=${projectName}`],
       {
         env: { ...process.env, CLOUDFLARE_API_TOKEN: token, CLOUDFLARE_ACCOUNT_ID: accountId },
         encoding: 'utf-8',
         timeout: 120_000,
+        shell: false,
       },
     );
 

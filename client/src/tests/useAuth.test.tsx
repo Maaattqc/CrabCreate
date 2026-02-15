@@ -12,6 +12,7 @@ const mockUser: AuthUser = {
   id: 1,
   email: 'test@example.com',
   isAdmin: false,
+  isVisitor: false,
   plan: 'free',
   stripeSubscriptionStatus: null,
   preferences: { lang: 'fr', theme: 'dark' },

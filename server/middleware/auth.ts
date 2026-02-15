@@ -51,7 +51,7 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
   }
 
   try {
-    const payload = jwt.verify(token, config.jwtSecret, { algorithms: ['HS512'] }) as JwtPayload;
+    const payload = jwt.verify(token, config.jwtSecret, { algorithms: ['HS512'] }) as JwtPayload & { iat?: number };
 
     // Verify user still exists
     const user = repo.findUserById(payload.userId);
@@ -62,11 +62,22 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
 
     // Check if user is blocked
     if (user.blocked === 1) {
-      res.status(403).json({ error: 'Account blocked', reason: user.blocked_reason || 'Contact support' });
+      res.status(403).json({ error: 'Account blocked', reason: 'Votre compte a été suspendu. Contactez le support.' });
       return;
     }
 
-    req.user = payload;
+    // Check if token was issued before logout (token revocation)
+    const invalidatedAt = repo.getUserTokenInvalidatedAt(payload.userId);
+    if (invalidatedAt && payload.iat) {
+      const invalidatedTimestamp = Math.floor(new Date(invalidatedAt).getTime() / 1000);
+      if (payload.iat <= invalidatedTimestamp) {
+        res.status(401).json({ error: 'Token revoked' });
+        return;
+      }
+    }
+
+    // Use email from DB (not JWT) to avoid stale data after email changes
+    req.user = { userId: payload.userId, email: user.email };
     next();
   } catch {
     res.status(401).json({ error: 'Invalid or expired token' });

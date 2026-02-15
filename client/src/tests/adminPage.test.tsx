@@ -204,6 +204,11 @@ describe('AdminPage', () => {
 
     render(<AdminPage />);
 
+    // Wait for initial loading to complete before clicking tab
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'adminUsers' })).toBeInTheDocument();
+    });
+
     fireEvent.click(screen.getByRole('button', { name: 'adminUsers' }));
 
     await waitFor(() => {

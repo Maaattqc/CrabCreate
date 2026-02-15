@@ -69,6 +69,15 @@ export default function Onboarding({ onDone, onCreateDemoTicket, onSimulatePipel
     return () => { mountedRef.current = false; clearTimers(); };
   }, []);
 
+  // Hidden shortcut: press 's' to skip tutorial
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 's' || e.key === 'S') { onDone(); }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onDone]);
+
   const steps: { text: string; icon: React.ReactNode; target: string; centered?: boolean }[] = [
     { text: t.onboardStep1, icon: '➕', target: 'create-ticket' },
     { text: t.onboardStep3, icon: '📊', target: 'columns', centered: true },

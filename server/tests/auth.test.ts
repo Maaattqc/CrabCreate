@@ -19,6 +19,7 @@ vi.mock('../config', () => ({
 // Mock repositories
 vi.mock('../db/repositories', () => ({
   findUserById: vi.fn(),
+  getUserTokenInvalidatedAt: vi.fn().mockReturnValue(null),
 }));
 
 import jwt from 'jsonwebtoken';
@@ -134,7 +135,7 @@ describe('requireAuth middleware', () => {
     expect(res.status).toHaveBeenCalledWith(403);
     expect(res.json).toHaveBeenCalledWith({
       error: 'Account blocked',
-      reason: 'Violation of terms',
+      reason: 'Votre compte a été suspendu. Contactez le support.',
     });
     expect(next).not.toHaveBeenCalled();
   });
@@ -165,12 +166,12 @@ describe('requireAuth middleware', () => {
     expect(res.status).toHaveBeenCalledWith(403);
     expect(res.json).toHaveBeenCalledWith({
       error: 'Account blocked',
-      reason: 'Contact support',
+      reason: 'Votre compte a été suspendu. Contactez le support.',
     });
   });
 
   it('calls next() and sets req.user when token and user are valid', () => {
-    const payload = { userId: 1, email: 'active@example.com' };
+    const payload = { userId: 1, email: 'active@example.com', iat: Math.floor(Date.now() / 1000) };
     vi.mocked(jwt.verify).mockReturnValue(payload as any);
     vi.mocked(repo.findUserById).mockReturnValue({
       id: 1,
@@ -194,7 +195,7 @@ describe('requireAuth middleware', () => {
     requireAuth(req, res, next);
 
     expect(next).toHaveBeenCalled();
-    expect(req.user).toEqual(payload);
+    expect(req.user).toEqual({ userId: 1, email: 'active@example.com' });
     expect(res.status).not.toHaveBeenCalled();
   });
 

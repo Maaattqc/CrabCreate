@@ -1,7 +1,6 @@
 import { Router, Request, Response } from 'express';
 import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
-import db from '../db/sqlite';
 import * as repo from '../db/repositories';
 import { validate } from '../middleware/validate';
 
@@ -11,6 +10,7 @@ const contactSchema = z.object({
   name: z.string().min(1, 'Nom requis').max(200),
   email: z.string().email('Email invalide').max(255),
   message: z.string().min(1, 'Message requis').max(5000),
+  website: z.string().max(0, 'Bot detected').optional(),  // honeypot field
 });
 
 // Rate limiter — window static (requires restart), limit dynamic
@@ -23,12 +23,15 @@ const contactLimiter = rateLimit({
 });
 
 router.post('/', contactLimiter, validate(contactSchema), (req: Request, res: Response) => {
+  // Honeypot: if "website" field is filled, it's a bot
+  if (req.body.website) {
+    res.json({ message: 'Message envoyé avec succès.' });
+    return;
+  }
   const { name, email, message } = req.body;
   const ip = req.ip || req.socket.remoteAddress || 'unknown';
 
-  db.prepare(
-    'INSERT INTO kanban_contact_messages (name, email, message, ip) VALUES (?, ?, ?, ?)'
-  ).run(name, email, message, ip);
+  repo.createContactMessage(name, email, message, ip);
 
   res.json({ message: 'Message envoyé avec succès.' });
 });

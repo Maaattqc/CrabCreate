@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import config from '../config';
+import logger from './logger';
 
 let transporter: nodemailer.Transporter | null = null;
 
@@ -37,7 +38,7 @@ export async function sendAuthCode(email: string, code: string, lang: 'fr' | 'en
   const smtp = getTransporter();
   if (!smtp) {
     // Only log code in dev when no SMTP is configured
-    console.log(`[Auth] No SMTP configured — code for ${email}: ${code}`);
+    console.log(`[Auth] No SMTP configured — code not sent for ${email}`);
     return;
   }
 
@@ -60,8 +61,8 @@ export async function sendAuthCode(email: string, code: string, lang: 'fr' | 'en
         </div>
       `,
     });
-    console.log(`[Auth] Email sent to ${email}`);
+    logger.info(`[Auth] Email sent to ${email}`);
   } catch (err) {
-    console.error('[Auth] Failed to send email:', err);
+    logger.error('[Auth] Failed to send email:', err);
   }
 }

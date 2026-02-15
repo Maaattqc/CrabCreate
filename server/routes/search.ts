@@ -5,7 +5,7 @@ const router = Router();
 
 // GET /api/search?q=...
 router.get('/', (req: Request, res: Response) => {
-  const query = (req.query.q as string || '').trim();
+  const query = (req.query.q as string || '').trim().slice(0, 500);
   if (!query || query.length < 2) {
     return res.json([]);
   }

@@ -112,4 +112,4 @@ export const submitFeedback = (rating: number): Promise<{ ok: boolean }> =>
 
 // File locks (project-scoped) & repos
 export const getFileLocks = (): Promise<FileLock[]> => projectRequest<FileLock[]>(`${API}/file-locks`);
-export const getRepos = (): Promise<string[]> => request<string[]>(`${API}/repos`);
+export const getRepos = (): Promise<string[]> => projectRequest<string[]>(`${API}/repos`);

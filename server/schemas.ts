@@ -18,7 +18,7 @@ export const updateTicketSchema = z.object({
   title: z.string().min(3).max(200).optional(),
   description: z.string().max(5000).optional(),
   priority: z.enum(['low', 'medium', 'high', 'critical']).optional(),
-  status: z.string().optional(),
+  status: z.enum(['backlog', 'todo', 'in_progress', 'estimating', 'ai_coding', 'ai_review', 'review', 'testing', 'deploying', 'done', 'cancelled']).optional(),
   template: z.string().optional(),
   ai_model: z.enum(['claude', 'gpt']).optional(),
   repo: z.string().optional(),
@@ -100,6 +100,31 @@ export const updateSettingsSchema = z.object({
   score_threshold_good: z.number().int().min(50).max(100).optional(),
   score_threshold_ok: z.number().int().min(20).max(80).optional(),
   activity_preview_length: z.number().int().min(20).max(200).optional(),
+});
+
+// ── Admin ──────────────────────────────────────────────────────────────────
+
+export const adminBlockSchema = z.object({
+  blocked: z.boolean(),
+  reason: z.string().max(500).optional(),
+});
+
+export const adminPlanSchema = z.object({
+  plan: z.enum(['free', 'pro', 'enterprise']),
+});
+
+export const adminToggleSchema = z.object({
+  isAdmin: z.boolean(),
+});
+
+// ── Auth preferences ───────────────────────────────────────────────────────
+
+export const preferencesSchema = z.object({
+  lang: z.enum(['fr', 'en']).optional(),
+  theme: z.enum(['dark', 'light']).optional(),
+  animations: z.boolean().optional(),
+  aiDesign: z.boolean().optional(),
+  mascot: z.boolean().optional(),
 });
 
 export const requestCodeSchema = z.object({

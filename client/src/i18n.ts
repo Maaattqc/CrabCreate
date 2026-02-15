@@ -329,6 +329,8 @@ export interface Translations {
   adminLogFilterPipeline: string;
   adminLogFilterAdmin: string;
   adminLogFilterFeedback: string;
+  adminLogFilterProject: string;
+  adminLogFilterDelete: string;
 
   // Settings categories
   settingsCatRateLimiting: string;
@@ -632,9 +634,17 @@ export interface Translations {
   markdownEdit: string;
   markdownHelp: string;
 
+  // History
+  historyTitle: string;
+  historyAll: string;
+  historyCompleted: string;
+  historyActive: string;
+  historyEmpty: string;
+
   // Export
   exportCSV: string;
   exportPDF: string;
+  exportHTML: string;
   exportTitle: string;
 
   // Reactions
@@ -987,6 +997,8 @@ export const translations: Record<Lang, Translations> = {
     adminLogFilterPipeline: 'Pipeline',
     adminLogFilterAdmin: 'Admin',
     adminLogFilterFeedback: 'Avis Guide',
+    adminLogFilterProject: 'Projets',
+    adminLogFilterDelete: 'Suppressions',
 
     settingsCatRateLimiting: 'Limites de débit',
     settingsCatIA: 'Intelligence Artificielle',
@@ -1261,8 +1273,15 @@ export const translations: Record<Lang, Translations> = {
     markdownEdit: 'Éditer',
     markdownHelp: 'Markdown supporté',
 
+    historyTitle: 'Historique',
+    historyAll: 'Tous',
+    historyCompleted: 'Terminés',
+    historyActive: 'En cours',
+    historyEmpty: 'Aucun billet trouvé',
+
     exportCSV: 'Exporter CSV',
     exportPDF: 'Exporter PDF',
+    exportHTML: 'Exporter HTML',
     exportTitle: 'Exporter',
 
     reactions: 'Réactions',
@@ -1608,6 +1627,8 @@ export const translations: Record<Lang, Translations> = {
     adminLogFilterPipeline: 'Pipeline',
     adminLogFilterAdmin: 'Admin',
     adminLogFilterFeedback: 'Guide Reviews',
+    adminLogFilterProject: 'Projects',
+    adminLogFilterDelete: 'Deletions',
 
     settingsCatRateLimiting: 'Rate Limiting',
     settingsCatIA: 'Artificial Intelligence',
@@ -1882,8 +1903,15 @@ export const translations: Record<Lang, Translations> = {
     markdownEdit: 'Edit',
     markdownHelp: 'Markdown supported',
 
+    historyTitle: 'History',
+    historyAll: 'All',
+    historyCompleted: 'Completed',
+    historyActive: 'Active',
+    historyEmpty: 'No tickets found',
+
     exportCSV: 'Export CSV',
     exportPDF: 'Export PDF',
+    exportHTML: 'Export HTML',
     exportTitle: 'Export',
 
     reactions: 'Reactions',

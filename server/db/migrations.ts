@@ -1,5 +1,11 @@
 import db from './sqlite';
 import config from '../config';
+import {
+  encryptSecret,
+  hashAuthCode,
+  isEncryptedSecret,
+  isHashedAuthCode,
+} from '../services/secrets';
 
 function migrate(): void {
   db.exec(`
@@ -326,6 +332,9 @@ function migrate(): void {
   if (authCols.length > 0 && !authColNames.includes('blocked_reason')) {
     db.exec("ALTER TABLE auth_users ADD COLUMN blocked_reason TEXT");
   }
+  if (authCols.length > 0 && !authColNames.includes('token_invalidated_at')) {
+    db.exec("ALTER TABLE auth_users ADD COLUMN token_invalidated_at TEXT");
+  }
   if (authCols.length > 0 && !authColNames.includes('stripe_customer_id')) {
     db.exec("ALTER TABLE auth_users ADD COLUMN stripe_customer_id TEXT");
   }
@@ -374,6 +383,21 @@ function migrate(): void {
     db.exec("ALTER TABLE kanban_repos ADD COLUMN clone_url TEXT DEFAULT ''");
   }
 
+  // Encrypt existing repo credentials at rest (idempotent)
+  try {
+    const repos = db.prepare('SELECT id, provider_token, clone_url FROM kanban_repos').all() as { id: string; provider_token: string; clone_url: string }[];
+    const upd = db.prepare('UPDATE kanban_repos SET provider_token = ?, clone_url = ? WHERE id = ?');
+    for (const r of repos) {
+      const nextProviderToken = r.provider_token && !isEncryptedSecret(r.provider_token) ? encryptSecret(r.provider_token) : r.provider_token;
+      const nextCloneUrl = r.clone_url && !isEncryptedSecret(r.clone_url) ? encryptSecret(r.clone_url) : r.clone_url;
+      if (nextProviderToken !== r.provider_token || nextCloneUrl !== r.clone_url) {
+        upd.run(nextProviderToken, nextCloneUrl, r.id);
+      }
+    }
+  } catch {
+    // best effort only
+  }
+
   // ── Deploy configs table ──
   db.exec(`
     CREATE TABLE IF NOT EXISTS kanban_deploy_configs (
@@ -388,6 +412,31 @@ function migrate(): void {
       created_at TEXT DEFAULT (datetime('now'))
     );
   `);
+
+  // Encrypt existing deploy credentials at rest (idempotent)
+  try {
+    const deployRows = db.prepare('SELECT id, cf_api_token FROM kanban_deploy_configs').all() as { id: number; cf_api_token: string | null }[];
+    const upd = db.prepare('UPDATE kanban_deploy_configs SET cf_api_token = ? WHERE id = ?');
+    for (const row of deployRows) {
+      if (!row.cf_api_token) continue;
+      if (isEncryptedSecret(row.cf_api_token)) continue;
+      upd.run(encryptSecret(row.cf_api_token), row.id);
+    }
+  } catch {
+    // best effort only
+  }
+
+  // Hash existing auth codes at rest (idempotent)
+  try {
+    const authRows = db.prepare('SELECT id, code FROM auth_codes').all() as { id: number; code: string }[];
+    const upd = db.prepare('UPDATE auth_codes SET code = ? WHERE id = ?');
+    for (const row of authRows) {
+      if (!row.code || isHashedAuthCode(row.code)) continue;
+      upd.run(hashAuthCode(row.code), row.id);
+    }
+  } catch {
+    // best effort only
+  }
 
   // ── Seed data ──
 
