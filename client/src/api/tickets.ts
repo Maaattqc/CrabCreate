@@ -1,4 +1,4 @@
-import type { Ticket, TicketFilters, LogEntry, ChatMessage, ActivityItem, AnalyticsData, FileLock } from '../types';
+import type { Ticket, TicketFilters, LogEntry, ChatMessage, ActivityItem, AnalyticsData, FileLock, ColumnTime } from '../types';
 import { apiJson, getCurrentProjectId } from './http';
 
 const API = '/api';
@@ -66,6 +66,7 @@ export const sendChatMessage = (id: number, message: string): Promise<ChatMessag
 });
 export const getTicketActivity = (id: number): Promise<ActivityItem[]> => projectRequest<ActivityItem[]>(`${API}/tickets/${id}/activity`);
 export const getTicketDiff = (id: number): Promise<string> => projectRequest<string>(`${API}/tickets/${id}/diff`);
+export const getTicketColumnTimes = (id: number): Promise<ColumnTime[]> => projectRequest<ColumnTime[]>(`${API}/tickets/${id}/column-times`);
 
 // Analytics (project-scoped)
 export const getAnalytics = (): Promise<AnalyticsData> => projectRequest<AnalyticsData>(`${API}/analytics`);

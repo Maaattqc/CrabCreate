@@ -1,9 +1,13 @@
+import path from 'path';
+import fs from 'fs';
 import config from '../config';
 import * as repoReader from './repo-reader';
 import * as repoDb from '../db/repositories';
+import * as cloudflarePages from './cloudflare-pages';
 import { createGitProvider } from './git-providers';
 import { emitTicketLog } from '../socket';
 import { isAllowedProjectRepoId } from '../security/project-repo';
+import logger from './logger';
 import type { Ticket, CodingResult, DeployResult, Repo } from '../types';
 
 /**
@@ -30,16 +34,15 @@ function getProvider(repo: Repo) {
 }
 
 function resolveAuthorizedRepo(ticket: Ticket): Repo | null {
-  if (!ticket.project_id) {
-    throw new Error(`Ticket "${ticket.id}" has no project context`);
-  }
+  if (!ticket.project_id) return null;
 
   const project = repoDb.findProjectById(ticket.project_id);
-  if (!project || !project.default_repo) {
-    throw new Error(`Project "${ticket.project_id}" has no default repo configured`);
-  }
+  if (!project) return null;
 
-  const projectRepoId = String(project.default_repo).trim();
+  // Project without repo (greenfield) — no repo to resolve
+  const projectRepoId = String(project.default_repo || '').trim();
+  if (!projectRepoId) return null;
+
   if (!isAllowedProjectRepoId(ticket.project_id, projectRepoId)) {
     throw new Error(`Security policy blocked unauthorized repo id for project ${ticket.project_id}`);
   }
@@ -53,31 +56,172 @@ function resolveAuthorizedRepo(ticket: Ticket): Repo | null {
 }
 
 /**
- * Deploy to staging: commit, push, create PR.
+ * Get Cloudflare credentials: project-level DB config first, then env vars fallback.
+ * The API token/account ID may be shared across projects, but each project gets
+ * its own CF Pages project with unique URLs (created automatically by deployCfFiles).
+ */
+function getCfCredentials(projectId: number | null): { token: string; accountId: string } | null {
+  if (!projectId) return null;
+  // 1. Project-level config (stored after first deploy)
+  const deployConfig = repoDb.findDeployConfigByProject(projectId);
+  if (deployConfig?.cf_api_token && deployConfig?.cf_account_id) {
+    return { token: deployConfig.cf_api_token, accountId: deployConfig.cf_account_id };
+  }
+  // 2. Global env vars — deployCfFiles will auto-create a unique CF project and store config in DB
+  const envToken = process.env.CF_API_TOKEN;
+  const envAccountId = process.env.CF_ACCOUNT_ID;
+  if (envToken && envAccountId) {
+    return { token: envToken, accountId: envAccountId };
+  }
+  return null;
+}
+
+/**
+ * Deploy files to Cloudflare Pages and return the per-deployment preview URL.
+ * Ensures the CF project exists, writes files to a temp dir, deploys via wrangler.
+ */
+async function deployCfFiles(
+  ticket: Ticket,
+  files: CodingResult['files'],
+  cf: { token: string; accountId: string },
+): Promise<string> {
+  const project = ticket.project_id ? repoDb.findProjectById(ticket.project_id) : null;
+  const slug = project?.slug || `proj-${ticket.project_id}`;
+  const cfProjectName = `crab-${slug}`.replace(/[^a-zA-Z0-9_-]/g, '-').substring(0, 58);
+
+  // Write generated files to a temp dist directory
+  const distDir = path.join(config.reposClonePath, `cf-deploy-${ticket.id}`);
+  if (fs.existsSync(distDir)) fs.rmSync(distDir, { recursive: true });
+  fs.mkdirSync(distDir, { recursive: true });
+
+  for (const file of files) {
+    const filePath = path.resolve(distDir, file.path);
+    // Path traversal protection
+    if (!filePath.startsWith(path.resolve(distDir) + path.sep) && filePath !== path.resolve(distDir)) continue;
+    const dir = path.dirname(filePath);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(filePath, file.content, 'utf-8');
+  }
+
+  // Auto-generate index.html if none was provided (prevents 522 on CF Pages)
+  const indexPath = path.join(distDir, 'index.html');
+  if (!fs.existsSync(indexPath)) {
+    const escapeHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const projectName = escapeHtml(project?.name || `Ticket #${ticket.id}`);
+    const fileLinks = files
+      .map(f => `<li><a href="/${escapeHtml(f.path)}">${escapeHtml(f.path)}</a></li>`)
+      .join('\n        ');
+    const html = `<!DOCTYPE html>
+<html lang="fr">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${projectName}</title>
+<style>body{font-family:system-ui,sans-serif;max-width:600px;margin:2rem auto;padding:0 1rem;color:#e4e4e7;background:#18181b}a{color:#38bdf8}h1{font-size:1.25rem}</style></head>
+<body>
+  <h1>${projectName}</h1>
+  <p>Fichiers déployés :</p>
+  <ul>
+        ${fileLinks}
+  </ul>
+</body>
+</html>`;
+    fs.writeFileSync(indexPath, html, 'utf-8');
+    emitTicketLog(ticket.id, 'index.html auto-généré', 'info', 'deploying');
+  }
+
+  // Ensure CF project exists
+  let deployConfig = ticket.project_id ? repoDb.findDeployConfigByProject(ticket.project_id) : null;
+  if (!deployConfig?.cf_project_name) {
+    try {
+      emitTicketLog(ticket.id, `Création du projet Cloudflare Pages "${cfProjectName}"...`, 'info', 'deploying');
+      const cfResult = await cloudflarePages.createProject(cf.accountId, cfProjectName, cf.token);
+
+      if (ticket.project_id) {
+        if (deployConfig) {
+          repoDb.updateDeployConfig(ticket.project_id, {
+            cf_project_name: cfResult.name,
+            cf_site_url: cfResult.url,
+            cf_api_token: cf.token,
+            cf_account_id: cf.accountId,
+          });
+        } else {
+          repoDb.createDeployConfig(ticket.project_id, {
+            cf_project_name: cfResult.name,
+            cf_site_url: cfResult.url,
+            cf_api_token: cf.token,
+            cf_account_id: cf.accountId,
+          });
+        }
+        deployConfig = repoDb.findDeployConfigByProject(ticket.project_id);
+      }
+    } catch (err) {
+      // Project might already exist — continue with deploy
+      logger.warn('[Deployer] CF project creation failed (may already exist):', (err as Error).message);
+    }
+  }
+
+  const projectName = deployConfig?.cf_project_name || cfProjectName;
+
+  // Deploy files — wrangler returns a unique preview URL per deployment
+  emitTicketLog(ticket.id, 'Déploiement sur Cloudflare Pages...', 'info', 'deploying');
+  const result = await cloudflarePages.deploy(cf.accountId, projectName, distDir, cf.token);
+
+  // Cleanup temp dir
+  try { fs.rmSync(distDir, { recursive: true }); } catch { /* ignore */ }
+
+  emitTicketLog(ticket.id, `Déployé sur ${result.url}`, 'success', 'deploying');
+
+  return result.url;
+}
+
+/**
+ * Deploy generated files to Cloudflare Pages for greenfield projects (no git repo).
+ */
+async function deployCfPages(ticket: Ticket, codingResult: CodingResult): Promise<DeployResult> {
+  const cf = getCfCredentials(ticket.project_id);
+  if (!cf) {
+    emitTicketLog(ticket.id, 'Pas de credentials Cloudflare configurés — mode simulation', 'warning', 'deploying');
+    return { prUrl: '#simulation', prId: 0, stagingUrl: '' };
+  }
+
+  const previewUrl = await deployCfFiles(ticket, codingResult.files, cf);
+
+  return {
+    prUrl: '#cloudflare-pages',
+    prId: 0,
+    stagingUrl: previewUrl,
+  };
+}
+
+/**
+ * Deploy to staging: commit, push, create PR — or CF Pages for greenfield.
+ * Every project with CF configured also gets a CF Pages preview deploy.
  */
 async function deployToStaging(ticket: Ticket, codingResult: CodingResult): Promise<DeployResult> {
   const repo = resolveAuthorizedRepo(ticket);
 
   if (!repo || !isRepoConfigured(repo)) {
-    // Simulation mode — no Git configured
+    // Greenfield project (no git repo) — CF Pages only
+    if (codingResult.files && codingResult.files.length > 0) {
+      try {
+        return await deployCfPages(ticket, codingResult);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        emitTicketLog(ticket.id, `Erreur déploiement CF Pages: ${msg}`, 'warning', 'deploying');
+      }
+    }
+
     emitTicketLog(ticket.id, 'Mode simulation: pas de repo Git configuré', 'warning', 'deploying');
-    return {
-      prUrl: '#simulation',
-      prId: 0,
-      stagingUrl: config.stagingBaseUrl ? `${config.stagingBaseUrl}/ticket-${ticket.id}` : '',
-    };
+    return { prUrl: '#simulation', prId: 0, stagingUrl: '' };
   }
 
+  // ── Git repo path: commit, push, create PR ──
   const branchName = codingResult.branchName;
   const commitMessage = `[CrabCreate #${ticket.id}] ${ticket.title}\n\n${codingResult.summary}`;
 
-  // Commit and push
   if (codingResult.repoDir) {
     await repoReader.commitAndPush(codingResult.repoDir, branchName, commitMessage);
     emitTicketLog(ticket.id, `Branche "${branchName}" pushée`, 'success', 'deploying');
   }
 
-  // Create PR via provider
   const provider = getProvider(repo);
   const targetBranch = repo.default_branch || repoDb.getConfig('git_default_branch') || 'master';
   const pr = await provider.createPR(
@@ -87,7 +231,17 @@ async function deployToStaging(ticket: Ticket, codingResult: CodingResult): Prom
     `**Auto-generated by CrabCreate**\n\n${ticket.description}\n\n---\nAI Model: ${ticket.ai_model}\nReview Score: ${ticket.ai_review_score || 'N/A'}/100`,
   );
 
-  const stagingUrl = config.stagingBaseUrl ? `${config.stagingBaseUrl}/ticket-${ticket.id}` : pr.url;
+  // ── Also deploy to CF Pages if configured → preview URL for review ──
+  let stagingUrl = '';
+  const cf = getCfCredentials(ticket.project_id);
+  if (cf && codingResult.files && codingResult.files.length > 0) {
+    try {
+      stagingUrl = await deployCfFiles(ticket, codingResult.files, cf);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      emitTicketLog(ticket.id, `CF Pages preview failed: ${msg}`, 'warning', 'deploying');
+    }
+  }
 
   return {
     prUrl: pr.url,

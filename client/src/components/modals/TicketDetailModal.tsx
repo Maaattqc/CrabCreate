@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
-import { X, Check, XCircle, RotateCcw, Undo2, Trash2, Activity, ShieldCheck, MessageSquare, Terminal, Code2, FlaskConical, User, Calendar, Eye, EyeOff, Users, Lock, CheckSquare, Clock } from 'lucide-react';
+import { X, Check, XCircle, RotateCcw, Undo2, Trash2, Activity, ShieldCheck, MessageSquare, Terminal, Code2, FlaskConical, User, Calendar, Eye, EyeOff, Users, Lock, CheckSquare, Clock, ExternalLink, Columns2 } from 'lucide-react';
 import { getColumnColor, getColumnLabel } from '../../constants';
-import { updateTicket } from '../../api/tickets';
+import { updateTicket, getTicketColumnTimes } from '../../api/tickets';
 import { fetchWatchers, toggleWatch } from '../../api/comments';
 import { useLanguage } from '../../hooks/useLanguage';
 import { useEditingLock, useTicketViewers } from '../../hooks/useCollaboration';
 import { useSocket } from '../../hooks/useSocket';
+import { useProject } from '../../hooks/useProject';
 import { useAuth } from '../../hooks/useAuth';
 import { userColor } from '../../hooks/useCursors';
 import TerminalLogs from '../detail-tabs/TerminalLogs';
@@ -16,7 +17,7 @@ import ChatTab from '../detail-tabs/ChatTab';
 import ActivityTab from '../detail-tabs/ActivityTab';
 import CommentsTab from '../detail-tabs/CommentsTab';
 import SubtasksTab from './SubtasksTab';
-import type { Ticket } from '../../types';
+import type { Ticket, ColumnTime } from '../../types';
 
 interface TicketDetailModalProps {
   ticket: Ticket;
@@ -33,6 +34,7 @@ export default function TicketDetailModal({ ticket, initialTab, onClose, onAppro
   const { t } = useLanguage();
   const { user } = useAuth();
   const { on, off } = useSocket();
+  const { currentProject } = useProject();
   const [activeTab, setActiveTab] = useState(initialTab || 'activity');
   const [title, setTitle] = useState(ticket.title);
   const [description, setDescription] = useState(ticket.description || '');
@@ -42,6 +44,10 @@ export default function TicketDetailModal({ ticket, initialTab, onClose, onAppro
   const [watchersCount, setWatchersCount] = useState(0);
   const [dueDate, setDueDate] = useState(ticket.due_date || '');
   const [showDueDateInput, setShowDueDateInput] = useState(false);
+  const [columnTimes, setColumnTimes] = useState<ColumnTime[]>([]);
+  const [showCompare, setShowCompare] = useState(false);
+  const productionUrl = currentProject?.cf_site_url || null;
+  const previewUrl = ticket.staging_url || null;
   const titleRef = useRef<HTMLInputElement>(null);
   const dueDateRef = useRef<HTMLInputElement>(null);
   const descRef = useRef<HTMLTextAreaElement>(null);
@@ -58,6 +64,17 @@ export default function TicketDetailModal({ ticket, initialTab, onClose, onAppro
   const formatDate = (date: string) => {
     const d = new Date(date);
     return d.toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' }) + ' ' + d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+  };
+  const formatDuration = (seconds: number) => {
+    if (seconds < 60) return `${seconds}s`;
+    const m = Math.floor(seconds / 60);
+    if (m < 60) return `${m}m`;
+    const h = Math.floor(m / 60);
+    const rm = m % 60;
+    if (h < 24) return rm > 0 ? `${h}h ${rm}m` : `${h}h`;
+    const d = Math.floor(h / 24);
+    const rh = h % 24;
+    return rh > 0 ? `${d}d ${rh}h` : `${d}d`;
   };
 
   const TABS = [
@@ -78,6 +95,7 @@ export default function TicketDetailModal({ ticket, initialTab, onClose, onAppro
       setWatching(data.isWatching);
       setWatchersCount(data.watchers.length);
     }).catch(() => {});
+    getTicketColumnTimes(ticket.id).then(setColumnTimes).catch(() => {});
     return () => { stopViewing(ticket.id); stopEditing(); };
   }, [ticket.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -159,7 +177,7 @@ export default function TicketDetailModal({ ticket, initialTab, onClose, onAppro
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
       <div
-        className="bg-surface border border-th-border-strong rounded-2xl w-full max-w-4xl mx-4 max-h-[90vh] flex flex-col shadow-2xl shadow-black/40"
+        className={`bg-surface border border-th-border-strong rounded-2xl w-full ${showCompare ? 'max-w-7xl' : 'max-w-4xl'} mx-4 max-h-[90vh] flex flex-col shadow-2xl shadow-black/40 transition-all duration-300`}
         onClick={(e: React.MouseEvent) => e.stopPropagation()}
       >
         {/* Header */}
@@ -279,9 +297,20 @@ export default function TicketDetailModal({ ticket, initialTab, onClose, onAppro
 
           {/* Meta info pills */}
           <div className="flex flex-wrap items-center gap-2 mt-3">
-            <span className="text-[11px] text-tx-faint bg-subtle px-2.5 py-1 rounded-md">
-              {ticket.ai_model === 'claude' ? '🟣 Claude' : '🟢 GPT'}
-            </span>
+            <select
+              value={ticket.ai_model}
+              onChange={async (e) => {
+                const newModel = e.target.value;
+                try {
+                  await updateTicket(ticket.id, { ai_model: newModel } as Partial<Ticket>);
+                  ticket.ai_model = newModel;
+                } catch { /* ignore */ }
+              }}
+              className="text-[11px] text-tx-faint bg-subtle px-2.5 py-1 rounded-md border-none outline-none cursor-pointer hover:bg-subtle-hover transition-colors"
+            >
+              <option value="claude">🟣 Claude</option>
+              <option value="gpt">🟢 GPT</option>
+            </select>
             {ticket.ai_review_score != null && (
               <span className={`text-[11px] font-medium px-2.5 py-1 rounded-md ${
                 ticket.ai_review_score >= 70 ? 'bg-green-500/10 text-green-400' :
@@ -306,6 +335,11 @@ export default function TicketDetailModal({ ticket, initialTab, onClose, onAppro
                 <span className="text-green-400">+{ticket.lines_added}</span>
                 <span className="text-tx-ghost mx-1">/</span>
                 <span className="text-red-400">-{ticket.lines_removed}</span>
+              </span>
+            )}
+            {ticket.pipeline_step > 0 && isActive && (
+              <span className="text-[11px] font-medium px-2.5 py-1 rounded-md bg-cyan-500/10 text-cyan-400">
+                {t.pipelineStep} {ticket.pipeline_step}/7
               </span>
             )}
             {/* Due date pill */}
@@ -351,6 +385,28 @@ export default function TicketDetailModal({ ticket, initialTab, onClose, onAppro
               />
             )}
           </div>
+
+          {/* Column times */}
+          {columnTimes.length > 0 && (
+            <div className="mt-3">
+              <span className="text-[10px] text-tx-faint font-medium uppercase tracking-wide">{t.columnTimesTitle}</span>
+              <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                {columnTimes.map(ct => {
+                  const color = getColumnColor(ct.status);
+                  return (
+                    <span
+                      key={ct.status}
+                      className="flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-md bg-subtle"
+                    >
+                      <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
+                      <span className="text-tx-faint">{getColumnLabel(ct.status, t as unknown as Record<string, string>)}</span>
+                      <span className="font-mono font-medium text-tx-tertiary">{formatDuration(ct.duration_seconds)}</span>
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Creator / modifier info */}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2.5 text-[11px] text-tx-faint">
@@ -414,10 +470,80 @@ export default function TicketDetailModal({ ticket, initialTab, onClose, onAppro
           {activeTab === 'subtasks' && <SubtasksTab ticketId={ticket.id} />}
         </div>
 
+        {/* Compare panel */}
+        {showCompare && (
+          <div className="px-8 py-4 border-t border-th-border">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-tx-secondary">{t.compareTitle}</h3>
+              <button onClick={() => setShowCompare(false)} className="p-1 rounded-md text-tx-faint hover:text-tx-primary hover:bg-subtle-hover transition-colors">
+                <X size={14} />
+              </button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Before (Production) */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-medium text-tx-faint uppercase tracking-wide">{t.compareBefore}</span>
+                  {productionUrl && (
+                    <a href={productionUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] text-cyan-400 hover:text-cyan-300 flex items-center gap-1">
+                      <ExternalLink size={10} />
+                    </a>
+                  )}
+                </div>
+                {productionUrl ? (
+                  <div className="h-[400px] rounded-lg border border-th-border overflow-hidden bg-white">
+                    <iframe src={productionUrl} className="w-full h-full" sandbox="allow-scripts allow-same-origin" title={t.compareBefore} />
+                  </div>
+                ) : (
+                  <div className="h-[400px] rounded-lg border border-th-border flex items-center justify-center bg-subtle">
+                    <span className="text-sm text-tx-faint">{t.compareNoProductionUrl}</span>
+                  </div>
+                )}
+              </div>
+              {/* After (Preview) */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-medium text-tx-faint uppercase tracking-wide">{t.compareAfter}</span>
+                  {previewUrl && (
+                    <a href={previewUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] text-cyan-400 hover:text-cyan-300 flex items-center gap-1">
+                      <ExternalLink size={10} />
+                    </a>
+                  )}
+                </div>
+                <div className="h-[400px] rounded-lg border border-th-border overflow-hidden bg-white">
+                  <iframe src={previewUrl!} className="w-full h-full" sandbox="allow-scripts allow-same-origin" title={t.compareAfter} />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Actions */}
         <div className="px-8 py-4 border-t border-th-border flex items-center gap-3">
           {ticket.status === 'review' && (
             <>
+              {ticket.staging_url && ticket.staging_url !== '#simulation' && (
+                <a href={ticket.staging_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-4 py-2 bg-blue-500/15 text-blue-400 text-sm font-medium rounded-lg hover:bg-blue-500/25 border border-blue-500/20 transition-all">
+                  <ExternalLink size={14} /> Staging
+                </a>
+              )}
+              {ticket.pr_url && !ticket.pr_url.startsWith('#') && (
+                <a href={ticket.pr_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-4 py-2 bg-purple-500/15 text-purple-400 text-sm font-medium rounded-lg hover:bg-purple-500/25 border border-purple-500/20 transition-all">
+                  <ExternalLink size={14} /> PR
+                </a>
+              )}
+              {previewUrl && previewUrl !== '#simulation' && (
+                <button
+                  onClick={() => setShowCompare(!showCompare)}
+                  className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg border transition-all ${
+                    showCompare
+                      ? 'bg-cyan-500/25 text-cyan-300 border-cyan-500/30'
+                      : 'bg-cyan-500/15 text-cyan-400 border-cyan-500/20 hover:bg-cyan-500/25'
+                  }`}
+                >
+                  <Columns2 size={14} /> {t.compareBtn}
+                </button>
+              )}
               <button onClick={() => onApprove(ticket.id)} className="flex items-center gap-2 px-4 py-2 bg-green-500/15 text-green-400 text-sm font-medium rounded-lg hover:bg-green-500/25 border border-green-500/20 transition-all">
                 <Check size={14} /> {t.approve}
               </button>
@@ -432,9 +558,21 @@ export default function TicketDetailModal({ ticket, initialTab, onClose, onAppro
             </button>
           )}
           {ticket.status === 'approved' && (
-            <button onClick={() => onRollback(ticket.id)} className="flex items-center gap-2 px-4 py-2 bg-amber-500/15 text-amber-400 text-sm font-medium rounded-lg hover:bg-amber-500/25 border border-amber-500/20 transition-all">
-              <Undo2 size={14} /> {t.rollback}
-            </button>
+            <>
+              {ticket.staging_url && ticket.staging_url !== '#simulation' && (
+                <a href={ticket.staging_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-4 py-2 bg-blue-500/15 text-blue-400 text-sm font-medium rounded-lg hover:bg-blue-500/25 border border-blue-500/20 transition-all">
+                  <ExternalLink size={14} /> {t.viewSite}
+                </a>
+              )}
+              {ticket.pr_url && !ticket.pr_url.startsWith('#') && (
+                <a href={ticket.pr_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-4 py-2 bg-purple-500/15 text-purple-400 text-sm font-medium rounded-lg hover:bg-purple-500/25 border border-purple-500/20 transition-all">
+                  <ExternalLink size={14} /> PR
+                </a>
+              )}
+              <button onClick={() => onRollback(ticket.id)} className="flex items-center gap-2 px-4 py-2 bg-amber-500/15 text-amber-400 text-sm font-medium rounded-lg hover:bg-amber-500/25 border border-amber-500/20 transition-all">
+                <Undo2 size={14} /> {t.rollback}
+              </button>
+            </>
           )}
           <div className="flex-1" />
           {!confirmDelete ? (

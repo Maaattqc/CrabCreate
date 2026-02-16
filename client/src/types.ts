@@ -20,9 +20,13 @@ export interface Ticket {
   tags: string;
   depends_on: string;
   complexity: string;
+  pipeline_step: number;
   position: number;
   due_date: string | null;
   branch_name: string;
+  pr_url: string;
+  pr_id: number;
+  staging_url: string;
   diff: string;
   creator_email: string | null;
   modifier_email: string | null;
@@ -152,6 +156,7 @@ export interface Project {
   cursors_enabled: number;
   presence_enabled: number;
   presence_max_visible: number;
+  cf_site_url: string | null;
   role: ProjectRole;
   created_at: string;
   updated_at: string;
@@ -346,3 +351,10 @@ export interface CreateRepoPayload {
 }
 
 export type ConfigureDeployPayload = Record<string, never>;
+
+// ── Column Times ────────────────────────────────────────────────────────
+
+export interface ColumnTime {
+  status: string;
+  duration_seconds: number;
+}

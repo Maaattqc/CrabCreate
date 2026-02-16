@@ -70,6 +70,8 @@ const BOOLEAN_KEYS = [
   'auto_deploy_enabled',
   'maintenance_mode',
   'git_pr_close_source_branch',
+  'auto_repo_enabled',
+  'auto_repo_default_private',
 ] as const;
 
 const STRING_KEYS = [
@@ -100,6 +102,8 @@ const DEFAULTS: Record<string, number | string> = {
   auto_test_enabled: 1,
   auto_deploy_enabled: 1,
   maintenance_mode: 0,
+  auto_repo_enabled: 1,
+  auto_repo_default_private: 1,
   log_retention_days: 90,
   plan_free_tickets: 5,
   plan_free_pipelines: 1,
@@ -109,7 +113,7 @@ const DEFAULTS: Record<string, number | string> = {
   plan_enterprise_pipelines: 10,
   // Modèles & Coûts
   ai_model_claude_version: 'claude-opus-4-6',
-  ai_model_gpt_version: 'gpt-5.3',
+  ai_model_gpt_version: 'gpt-5.2-2025-12-11',
   ai_cost_per_token_claude: 0.000015,
   ai_cost_per_token_gpt: 0.00003,
   ai_tokens_complexity: 500,
@@ -189,6 +193,8 @@ const NUMERIC_BOUNDS: Record<string, { min: number; max: number }> = {
   auto_deploy_enabled: { min: 0, max: 1 },
   maintenance_mode: { min: 0, max: 1 },
   git_pr_close_source_branch: { min: 0, max: 1 },
+  auto_repo_enabled: { min: 0, max: 1 },
+  auto_repo_default_private: { min: 0, max: 1 },
 };
 
 function readAllSettings(): Record<string, number | string> {

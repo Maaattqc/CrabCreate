@@ -88,6 +88,9 @@ export const updateSettingsSchema = z.object({
   chat_messages_per_minute: z.number().int().min(1).max(120).optional(),
   export_requests_per_hour: z.number().int().min(1).max(200).optional(),
   max_user_webhooks_per_project: z.number().int().min(1).max(100).optional(),
+  // Auto-repo
+  auto_repo_enabled: z.number().int().min(0).max(1).optional(),
+  auto_repo_default_private: z.number().int().min(0).max(1).optional(),
   // Git & Deploy
   git_default_branch: z.string().min(1).max(100).optional(),
   git_merge_strategy: z.enum(['merge_commit', 'squash', 'fast_forward']).optional(),
@@ -147,6 +150,7 @@ export const createProjectSchema = z.object({
   slug: z.string().min(2).max(60).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Slug invalide (minuscules, chiffres, tirets)'),
   is_private: z.number().int().min(0).max(1).optional().default(1),
   default_repo: z.string().optional().default('main-site'),
+  auto_repo: z.boolean().optional(),
 });
 
 export const updateProjectSchema = z.object({

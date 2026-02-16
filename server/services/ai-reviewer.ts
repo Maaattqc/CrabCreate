@@ -27,7 +27,7 @@ Respond in JSON:
 
   try {
     const claudeModel = repo.getConfig('ai_model_claude_version') || 'claude-opus-4-6';
-    const gptModel = repo.getConfig('ai_model_gpt_version') || 'gpt-5.3';
+    const gptModel = repo.getConfig('ai_model_gpt_version') || 'gpt-5.2-2025-12-11';
     const tokensReview = parseInt(repo.getConfig('ai_tokens_review') || '2048', 10);
 
     let response: string;
@@ -41,7 +41,7 @@ Respond in JSON:
     } else {
       const msg = await client.chat.completions.create({
         model: gptModel,
-        max_tokens: tokensReview,
+        max_completion_tokens: tokensReview,
         messages: [{ role: 'user', content: prompt }],
       });
       response = msg.choices[0].message.content || '';

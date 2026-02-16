@@ -29,7 +29,7 @@ Réponds en JSON: { "complexity": "easy|medium|hard", "reason": "..." }`;
   try {
     let response: string;
     const claudeModel = repo.getConfig('ai_model_claude_version') || 'claude-opus-4-6';
-    const gptModel = repo.getConfig('ai_model_gpt_version') || 'gpt-5.3';
+    const gptModel = repo.getConfig('ai_model_gpt_version') || 'gpt-5.2-2025-12-11';
     const tokensComplexity = parseInt(repo.getConfig('ai_tokens_complexity') || '500', 10);
 
     if (type === 'anthropic') {
@@ -42,7 +42,7 @@ Réponds en JSON: { "complexity": "easy|medium|hard", "reason": "..." }`;
     } else {
       const msg = await client.chat.completions.create({
         model: gptModel,
-        max_tokens: tokensComplexity,
+        max_completion_tokens: tokensComplexity,
         messages: [{ role: 'user', content: prompt }],
       });
       response = msg.choices[0].message.content || '';
@@ -73,17 +73,29 @@ async function generateCode(ticket: Ticket): Promise<CodingResult> {
     targetFiles = JSON.parse(ticket.target_files || '[]');
   } catch { targetFiles = []; }
 
-  // Read repo and files
+  // Read repo and files (skip if project has no repo configured)
   let existingFiles: { path: string; content: string }[] = [];
   let repoDir = '';
-  try {
-    const result = await repoReader.cloneOrPull(ticket);
-    repoDir = result.repoDir;
-    existingFiles = repoReader.readTargetFiles(repoDir, targetFiles);
-    emitTicketLog(ticket.id, `Repo cloné, ${existingFiles.length} fichier(s) lu(s)`, 'info', 'coding');
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err);
-    emitTicketLog(ticket.id, `Erreur repo: ${message}. Mode simulation.`, 'warning', 'coding');
+  const project = ticket.project_id ? repo.findProjectById(ticket.project_id) : undefined;
+  const hasRepo = project && String(project.default_repo || '').trim();
+
+  if (hasRepo) {
+    try {
+      const result = await repoReader.cloneOrPull(ticket);
+      repoDir = result.repoDir;
+      if (targetFiles.length > 0) {
+        existingFiles = repoReader.readTargetFiles(repoDir, targetFiles);
+      } else {
+        // No target files specified — auto-discover repo files for context
+        existingFiles = repoReader.discoverFiles(repoDir);
+      }
+      emitTicketLog(ticket.id, `Repo cloné, ${existingFiles.length} fichier(s) lu(s)`, 'info', 'coding');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      emitTicketLog(ticket.id, `Erreur repo: ${message}. Mode simulation.`, 'warning', 'coding');
+    }
+  } else {
+    emitTicketLog(ticket.id, 'Projet sans repo — génération from scratch', 'info', 'coding');
   }
 
   // Read DB docs
@@ -126,7 +138,7 @@ ${JSON.stringify({ title: ticket.title, description: ticket.description })}
 
   try {
     const claudeModelCode = repo.getConfig('ai_model_claude_version') || 'claude-opus-4-6';
-    const gptModelCode = repo.getConfig('ai_model_gpt_version') || 'gpt-5.3';
+    const gptModelCode = repo.getConfig('ai_model_gpt_version') || 'gpt-5.2-2025-12-11';
 
     if (type === 'anthropic') {
       const msg = await client.messages.create({
@@ -140,7 +152,7 @@ ${JSON.stringify({ title: ticket.title, description: ticket.description })}
     } else {
       const msg = await client.chat.completions.create({
         model: gptModelCode,
-        max_tokens: maxTokens,
+        max_completion_tokens: maxTokens,
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt },
@@ -237,7 +249,7 @@ async function chat(ticket: Ticket, history: ChatMessage[], userMessage: string)
   let response: string;
   try {
     const claudeModelChat = repo.getConfig('ai_model_claude_version') || 'claude-opus-4-6';
-    const gptModelChat = repo.getConfig('ai_model_gpt_version') || 'gpt-5.3';
+    const gptModelChat = repo.getConfig('ai_model_gpt_version') || 'gpt-5.2-2025-12-11';
     const tokensChat = parseInt(repo.getConfig('ai_tokens_chat') || '4096', 10);
 
     if (type === 'anthropic') {
@@ -251,7 +263,7 @@ async function chat(ticket: Ticket, history: ChatMessage[], userMessage: string)
     } else {
       const msg = await client.chat.completions.create({
         model: gptModelChat,
-        max_tokens: tokensChat,
+        max_completion_tokens: tokensChat,
         messages: [{ role: 'system' as const, content: systemPrompt }, ...messages],
       });
       response = msg.choices[0].message.content || '';

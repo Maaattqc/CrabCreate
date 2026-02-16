@@ -15,8 +15,11 @@ async function request<T>(url: string, options: RequestInit = {}): Promise<T> {
 // Projects CRUD
 export const getProjects = (): Promise<Project[]> => request<Project[]>(`${API}/projects`);
 
-export const createProject = (data: { name: string; slug: string; description?: string; is_private?: number; default_repo?: string }): Promise<Project> =>
-  request<Project>(`${API}/projects`, { method: 'POST', body: JSON.stringify(data) });
+export const createProject = (data: { name: string; slug: string; description?: string; is_private?: number; default_repo?: string; auto_repo?: boolean }): Promise<Project & { autoRepoCreated?: boolean; autoRepoWebUrl?: string; autoRepoError?: string }> =>
+  request<Project & { autoRepoCreated?: boolean; autoRepoWebUrl?: string; autoRepoError?: string }>(`${API}/projects`, { method: 'POST', body: JSON.stringify(data) });
+
+export const getAutoRepoStatus = (): Promise<{ available: boolean }> =>
+  request<{ available: boolean }>(`${API}/projects/auto-repo-status`);
 
 export const getProject = (id: number): Promise<Project> =>
   request<Project>(`${API}/projects/${id}`, { headers: { 'X-Project-Id': String(id) } });

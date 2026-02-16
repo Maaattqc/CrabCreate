@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Users, Mail, Settings, BarChart3, Shield, ShieldOff, Crown, Trash2,
   ArrowLeft, X, AlertTriangle, ScrollText, Loader2,
-  Brain, Lock, Workflow, Wrench, CreditCard, Cpu, GitBranch, Monitor,
+  Brain, Lock, Workflow, Wrench, CreditCard, Cpu, GitBranch, GitFork, Monitor,
 } from 'lucide-react';
 import { useLanguage } from '../../hooks/useLanguage';
 import { useAuth } from '../../hooks/useAuth';
@@ -92,6 +92,9 @@ interface AdminSettings {
   git_merge_strategy: string;
   git_pr_close_source_branch: number;
   branch_name_max_length: number;
+  // Auto-repo
+  auto_repo_enabled: number;
+  auto_repo_default_private: number;
   // Queue & Pipeline
   queue_polling_interval_ms: number;
   test_multiplier_per_file: number;
@@ -153,7 +156,8 @@ export default function AdminPage() {
     auth_code_expiry_minutes: 10, auth_code_limit: 5, auth_code_window_minutes: 15,
     auth_verify_limit: 5, auth_verify_window_minutes: 15, contact_limit: 3, contact_window_minutes: 60,
     git_default_branch: 'master', git_merge_strategy: 'merge_commit', git_pr_close_source_branch: 1,
-    branch_name_max_length: 50, queue_polling_interval_ms: 5000, test_multiplier_per_file: 3,
+    branch_name_max_length: 50, auto_repo_enabled: 0, auto_repo_default_private: 1,
+    queue_polling_interval_ms: 5000, test_multiplier_per_file: 3,
     audit_log_default_limit: 50, audit_log_max_limit: 500, notification_timeout_ms: 5000,
     score_threshold_good: 70, score_threshold_ok: 50, activity_preview_length: 80,
   });
@@ -835,6 +839,17 @@ function SettingsTab({
         { type: 'select', key: 'git_merge_strategy', label: t.settingsGitMergeStrategy, desc: t.settingsGitMergeStrategyDesc, options: [{ value: 'merge_commit', label: 'Merge commit' }, { value: 'squash', label: 'Squash' }, { value: 'fast_forward', label: 'Fast-forward' }] },
         { type: 'toggle', key: 'git_pr_close_source_branch', label: t.settingsGitCloseBranch, desc: t.settingsGitCloseBranchDesc },
         { type: 'number', key: 'branch_name_max_length', label: t.settingsBranchMaxLength, desc: t.settingsBranchMaxLengthDesc, min: 15, max: 100 },
+      ],
+    },
+    {
+      key: 'autoRepo',
+      label: t.settingsCatAutoRepo,
+      icon: GitFork,
+      color: 'text-teal-400',
+      bgTint: 'bg-teal-500/10',
+      fields: [
+        { type: 'toggle', key: 'auto_repo_enabled', label: t.settingsAutoRepoEnabled, desc: t.settingsAutoRepoEnabledDesc },
+        { type: 'toggle', key: 'auto_repo_default_private', label: t.settingsAutoRepoDefaultPrivate, desc: t.settingsAutoRepoDefaultPrivateDesc },
       ],
     },
     {

@@ -46,8 +46,10 @@ async function cloneOrPull(ticket: Ticket): Promise<{ repoDir: string; repo: Rep
   const git = simpleGit();
 
   if (fs.existsSync(path.join(repoDir, '.git'))) {
-    // Pull latest
+    // Pull latest — clean untracked files from previous runs first
     const repoGit = simpleGit(repoDir);
+    await repoGit.clean('f', ['-d']);
+    await repoGit.reset(['--hard']);
     const defaultBranch = repoDb.getConfig('git_default_branch') || 'master';
     await repoGit.checkout(repo.default_branch || defaultBranch);
     await repoGit.pull();
@@ -130,16 +132,70 @@ function writeFiles(repoDir: string, files: { path: string; content: string }[])
 async function commitAndPush(repoDir: string, branchName: string, commitMessage: string): Promise<void> {
   const git = simpleGit(repoDir);
 
-  // Create and checkout branch
+  // Stage all files BEFORE switching branches — prevents "untracked working tree
+  // files would be overwritten by checkout" when AI-generated files (e.g. assets/,
+  // index.html) already exist on the target branch.
+  await git.add('.');
+
+  // Create branch (or reset it to current HEAD if it already exists from a previous run)
+  // checkout -B = create or reset branch to current position
   try {
     await git.checkoutLocalBranch(branchName);
   } catch {
-    await git.checkout(branchName);
+    await git.checkout(['-B', branchName]);
   }
 
   await git.add('.');
   await git.commit(commitMessage);
-  await git.push('origin', branchName, ['--set-upstream']);
+  await git.push('origin', branchName, ['--set-upstream', '--force']);
 }
 
-export { cloneOrPull, readTargetFiles, writeFiles, commitAndPush };
+/**
+ * Auto-discover key files from a repo when no target_files are specified.
+ * Reads up to `limit` files, skipping binary/vendor/large files.
+ */
+function discoverFiles(repoDir: string, limit = 15): { path: string; content: string }[] {
+  const resolvedBase = path.resolve(repoDir);
+  const SKIP_DIRS = new Set(['node_modules', '.git', 'vendor', 'dist', 'build', '.next', '__pycache__', '.cache', 'coverage']);
+  const SKIP_EXTS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.ico', '.svg', '.woff', '.woff2', '.ttf', '.eot', '.mp4', '.webm', '.zip', '.tar', '.gz', '.lock', '.map']);
+  const MAX_FILE_SIZE = 30_000; // 30KB
+  const files: { path: string; content: string }[] = [];
+
+  function walk(dir: string) {
+    if (files.length >= limit) return;
+    let entries: fs.Dirent[];
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch { return; }
+
+    for (const entry of entries) {
+      if (files.length >= limit) return;
+      if (entry.name.startsWith('.')) continue;
+
+      if (entry.isDirectory()) {
+        if (SKIP_DIRS.has(entry.name)) continue;
+        walk(path.join(dir, entry.name));
+      } else if (entry.isFile()) {
+        const ext = path.extname(entry.name).toLowerCase();
+        if (SKIP_EXTS.has(ext)) continue;
+
+        const fullPath = path.join(dir, entry.name);
+        const resolved = path.resolve(fullPath);
+        if (!resolved.startsWith(resolvedBase + path.sep)) continue;
+
+        try {
+          const stat = fs.statSync(fullPath);
+          if (stat.size > MAX_FILE_SIZE) continue;
+          const content = fs.readFileSync(fullPath, 'utf-8');
+          const relPath = path.relative(repoDir, fullPath).replace(/\\/g, '/');
+          files.push({ path: relPath, content });
+        } catch { /* skip unreadable */ }
+      }
+    }
+  }
+
+  walk(repoDir);
+  return files;
+}
+
+export { cloneOrPull, readTargetFiles, writeFiles, commitAndPush, discoverFiles };

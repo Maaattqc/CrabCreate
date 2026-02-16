@@ -13,6 +13,10 @@ vi.mock('../hooks/useLanguage', () => ({
       projectDescription: 'Description',
       projectPrivate: 'Privé',
       projectCollaborative: 'Collaboratif',
+      projectConnectRepo: 'Se connecter à un repo existant',
+      projectConnectRepoDesc: 'GitHub / GitLab / Bitbucket · Base de données non incluse · Déploiement serveur non inclus',
+      projectNewComplete: 'Nouveau projet complet',
+      projectNewCompleteDesc: 'Aucun code de départ · Base de données créée · Déploiement serveur compris',
       projectSettings: 'Paramètres du projet',
       projectGeneral: 'Général',
       projectMembers: 'Membres',
@@ -40,11 +44,22 @@ vi.mock('../hooks/useLanguage', () => ({
       projectSwitchTo: 'Passer à',
       projectInvitationsBadge: 'Invitations',
       cancel: 'Annuler',
+      continueBtn: 'Continuer',
       create: 'Créer',
       creating: 'Création...',
       save: 'Enregistrer',
       saving: 'Enregistrement...',
       loading: 'Chargement...',
+      billingPlanLimitProjects: 'Limite de projets atteinte',
+      validationProjectNameHint: '2 caractères minimum',
+      validationSlugHint: 'Lettres minuscules, chiffres et tirets',
+      validationDescProjectHint: 'Optionnel',
+      validationCharsRemaining: 'caractères restants',
+      setupProvider: 'Fournisseur',
+      setupToken: 'Token',
+      setupOwner: 'Propriétaire',
+      setupRepoName: 'Nom du repo',
+      setupBranch: 'Branche',
     },
     setLang: vi.fn(),
   }),
@@ -59,7 +74,7 @@ const mockRejectInvitation = vi.fn();
 vi.mock('../hooks/useProject', () => ({
   useProject: () => ({
     projects: [],
-    currentProject: { id: 1, name: 'Test Project', slug: 'test-project', owner_id: 1, is_private: 1, default_repo: 'main-site', role: 'owner' },
+    currentProject: { id: 1, name: 'Test Project', slug: 'test-project', owner_id: 1, is_private: 1, default_repo: 'main-site', cf_site_url: null, role: 'owner' },
     invitations: mockInvitations,
     loading: false,
     switchProject: vi.fn(),
@@ -71,6 +86,14 @@ vi.mock('../hooks/useProject', () => ({
     acceptInvitation: mockAcceptInvitation,
     rejectInvitation: mockRejectInvitation,
   }),
+}));
+
+// ── Mock connectRepo ─────────────────────────────────────────────────────────
+
+const mockConnectRepo = vi.fn();
+
+vi.mock('../api/project-setup', () => ({
+  connectRepo: (...args: any[]) => mockConnectRepo(...args),
 }));
 
 let mockInvitations: any[] = [];
@@ -87,11 +110,21 @@ describe('CreateProjectModal', () => {
     vi.clearAllMocks();
   });
 
-  it('renders the create project form', () => {
-    const onClose = vi.fn();
-    render(<CreateProjectModal onClose={onClose} />);
+  it('renders the choice screen with two options', () => {
+    render(<CreateProjectModal onClose={vi.fn()} />);
 
     expect(screen.getByText('Nouveau projet')).toBeInTheDocument();
+    expect(screen.getByText('Se connecter à un repo existant')).toBeInTheDocument();
+    expect(screen.getByText(/GitHub \/ GitLab \/ Bitbucket/)).toBeInTheDocument();
+    expect(screen.getByText('Nouveau projet complet')).toBeInTheDocument();
+    expect(screen.getByText(/Aucun code de départ/)).toBeInTheDocument();
+  });
+
+  it('shows project form when "Nouveau projet complet" is clicked', () => {
+    render(<CreateProjectModal onClose={vi.fn()} />);
+
+    fireEvent.click(screen.getByText('Nouveau projet complet'));
+
     expect(screen.getByText(/Nom du projet/)).toBeInTheDocument();
     expect(screen.getByText(/Slug \(URL\)/)).toBeInTheDocument();
     expect(screen.getByText('Description')).toBeInTheDocument();
@@ -99,8 +132,27 @@ describe('CreateProjectModal', () => {
     expect(screen.getByText('Collaboratif')).toBeInTheDocument();
   });
 
+  it('shows git fields + project form when "Se connecter à un repo existant" is clicked', () => {
+    render(<CreateProjectModal onClose={vi.fn()} />);
+
+    fireEvent.click(screen.getByText('Se connecter à un repo existant'));
+
+    // Git fields
+    expect(screen.getByText('Fournisseur')).toBeInTheDocument();
+    expect(screen.getByText('Token')).toBeInTheDocument();
+    expect(screen.getByText('Propriétaire')).toBeInTheDocument();
+    expect(screen.getByText('Nom du repo')).toBeInTheDocument();
+    expect(screen.getByText('Branche')).toBeInTheDocument();
+
+    // Project fields
+    expect(screen.getByText(/Nom du projet/)).toBeInTheDocument();
+    expect(screen.getByText(/Slug \(URL\)/)).toBeInTheDocument();
+  });
+
   it('has a disabled submit button when fields are empty', () => {
     render(<CreateProjectModal onClose={vi.fn()} />);
+
+    fireEvent.click(screen.getByText('Nouveau projet complet'));
 
     const submitBtn = screen.getByText('Créer');
     expect(submitBtn).toBeDisabled();
@@ -108,6 +160,8 @@ describe('CreateProjectModal', () => {
 
   it('auto-generates slug from name', () => {
     render(<CreateProjectModal onClose={vi.fn()} />);
+
+    fireEvent.click(screen.getByText('Nouveau projet complet'));
 
     const nameInput = screen.getByPlaceholderText('Mon super projet');
     fireEvent.change(nameInput, { target: { value: 'My New Project' } });
@@ -119,6 +173,8 @@ describe('CreateProjectModal', () => {
   it('enables submit button when name and slug are filled', () => {
     render(<CreateProjectModal onClose={vi.fn()} />);
 
+    fireEvent.click(screen.getByText('Nouveau projet complet'));
+
     const nameInput = screen.getByPlaceholderText('Mon super projet');
     fireEvent.change(nameInput, { target: { value: 'Test' } });
 
@@ -126,11 +182,13 @@ describe('CreateProjectModal', () => {
     expect(submitBtn).not.toBeDisabled();
   });
 
-  it('calls createProject and onClose on successful submit', async () => {
+  it('calls createProject and onClose on successful submit (new mode)', async () => {
     mockCreateProject.mockResolvedValue({ id: 2, name: 'New', slug: 'new' });
     const onClose = vi.fn();
 
     render(<CreateProjectModal onClose={onClose} />);
+
+    fireEvent.click(screen.getByText('Nouveau projet complet'));
 
     const nameInput = screen.getByPlaceholderText('Mon super projet');
     fireEvent.change(nameInput, { target: { value: 'New Project' } });
@@ -149,11 +207,45 @@ describe('CreateProjectModal', () => {
     });
   });
 
+  it('calls createProject + connectRepo on successful submit (connect mode)', async () => {
+    mockCreateProject.mockResolvedValue({ id: 5, name: 'Connected', slug: 'connected' });
+    mockConnectRepo.mockResolvedValue({ success: true, repoId: 'repo-1' });
+    const onClose = vi.fn();
+
+    render(<CreateProjectModal onClose={onClose} />);
+
+    fireEvent.click(screen.getByText('Se connecter à un repo existant'));
+
+    // Fill git fields
+    fireEvent.change(screen.getByPlaceholderText('ghp_xxxx... / glpat-xxxx...'), { target: { value: 'ghp_test123' } });
+    fireEvent.change(screen.getByPlaceholderText('my-org'), { target: { value: 'my-org' } });
+    fireEvent.change(screen.getByPlaceholderText('my-app'), { target: { value: 'my-repo' } });
+
+    // Fill project fields
+    fireEvent.change(screen.getByPlaceholderText('Mon super projet'), { target: { value: 'Connected' } });
+
+    fireEvent.click(screen.getByText('Créer'));
+
+    await waitFor(() => {
+      expect(mockCreateProject).toHaveBeenCalled();
+      expect(mockConnectRepo).toHaveBeenCalledWith({
+        provider: 'github',
+        owner: 'my-org',
+        repo: 'my-repo',
+        token: 'ghp_test123',
+        branch: 'main',
+      });
+      expect(onClose).toHaveBeenCalled();
+    });
+  });
+
   it('displays error on submit failure', async () => {
     mockCreateProject.mockRejectedValue(new Error('Slug already taken'));
     const onClose = vi.fn();
 
     render(<CreateProjectModal onClose={onClose} />);
+
+    fireEvent.click(screen.getByText('Nouveau projet complet'));
 
     const nameInput = screen.getByPlaceholderText('Mon super projet');
     fireEvent.change(nameInput, { target: { value: 'Fail Project' } });
@@ -172,6 +264,7 @@ describe('CreateProjectModal', () => {
     const onClose = vi.fn();
     render(<CreateProjectModal onClose={onClose} />);
 
+    fireEvent.click(screen.getByText('Nouveau projet complet'));
     fireEvent.click(screen.getByText('Annuler'));
     expect(onClose).toHaveBeenCalled();
   });
@@ -180,7 +273,6 @@ describe('CreateProjectModal', () => {
     const onClose = vi.fn();
     const { container } = render(<CreateProjectModal onClose={onClose} />);
 
-    // Click on the backdrop (first fixed div)
     const backdrop = container.firstChild as HTMLElement;
     fireEvent.click(backdrop);
     expect(onClose).toHaveBeenCalled();
@@ -189,10 +281,11 @@ describe('CreateProjectModal', () => {
   it('toggles between private and collaborative', async () => {
     render(<CreateProjectModal onClose={vi.fn()} />);
 
+    fireEvent.click(screen.getByText('Nouveau projet complet'));
+
     const collaborativeBtn = screen.getByText('Collaboratif');
     fireEvent.click(collaborativeBtn);
 
-    // Fill in required fields and submit to check the is_private value
     const nameInput = screen.getByPlaceholderText('Mon super projet');
     fireEvent.change(nameInput, { target: { value: 'Collab' } });
 
@@ -203,6 +296,46 @@ describe('CreateProjectModal', () => {
       expect(mockCreateProject).toHaveBeenCalledWith(
         expect.objectContaining({ is_private: 0 }),
       );
+    });
+  });
+
+  it('goes back to choice screen when back arrow is clicked', () => {
+    render(<CreateProjectModal onClose={vi.fn()} />);
+
+    fireEvent.click(screen.getByText('Se connecter à un repo existant'));
+
+    // Should be on git form
+    expect(screen.getByText('Fournisseur')).toBeInTheDocument();
+
+    // Click back arrow (ArrowLeft icon button)
+    const backBtn = screen.getByText('Nouveau projet').closest('div')!.querySelector('button');
+    fireEvent.click(backBtn!);
+
+    // Should be back on choice screen
+    expect(screen.getByText('Se connecter à un repo existant')).toBeInTheDocument();
+    expect(screen.getByText('Nouveau projet complet')).toBeInTheDocument();
+  });
+
+  it('still closes even if connectRepo fails', async () => {
+    mockCreateProject.mockResolvedValue({ id: 10, name: 'P', slug: 'p' });
+    mockConnectRepo.mockRejectedValue(new Error('Bad token'));
+    const onClose = vi.fn();
+
+    render(<CreateProjectModal onClose={onClose} />);
+
+    fireEvent.click(screen.getByText('Se connecter à un repo existant'));
+
+    fireEvent.change(screen.getByPlaceholderText('ghp_xxxx... / glpat-xxxx...'), { target: { value: 'bad' } });
+    fireEvent.change(screen.getByPlaceholderText('my-org'), { target: { value: 'org' } });
+    fireEvent.change(screen.getByPlaceholderText('my-app'), { target: { value: 'repo' } });
+    fireEvent.change(screen.getByPlaceholderText('Mon super projet'), { target: { value: 'P' } });
+
+    fireEvent.click(screen.getByText('Créer'));
+
+    await waitFor(() => {
+      // Project was created, modal closed despite repo error
+      expect(mockCreateProject).toHaveBeenCalled();
+      expect(onClose).toHaveBeenCalled();
     });
   });
 });

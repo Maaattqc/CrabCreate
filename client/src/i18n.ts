@@ -26,6 +26,7 @@ export interface Translations {
   descriptionPlaceholder: string;
   aiModelLabel: string;
   cancel: string;
+  continueBtn: string;
   create: string;
   creating: string;
 
@@ -408,6 +409,24 @@ export interface Translations {
   settingsContactWindow: string;
   settingsContactWindowDesc: string;
 
+  // Auto-repo
+  settingsCatAutoRepo: string;
+  settingsAutoRepoEnabled: string;
+  settingsAutoRepoEnabledDesc: string;
+  settingsAutoRepoDefaultPrivate: string;
+  settingsAutoRepoDefaultPrivateDesc: string;
+  autoRepoCreating: string;
+  autoRepoSuccess: string;
+  autoRepoFailed: string;
+  autoRepoManualSetup: string;
+  repoOptionAuto: string;
+  repoOptionAutoDesc: string;
+  repoOptionManual: string;
+  repoOptionManualDesc: string;
+  repoOptionNone: string;
+  repoOptionNoneDesc: string;
+  repoSetupLabel: string;
+
   // Git & Deploy
   settingsCatGit: string;
   settingsGitDefaultBranch: string;
@@ -482,6 +501,10 @@ export interface Translations {
   projectDescription: string;
   projectPrivate: string;
   projectCollaborative: string;
+  projectConnectRepo: string;
+  projectConnectRepoDesc: string;
+  projectNewComplete: string;
+  projectNewCompleteDesc: string;
   projectDefaultRepo: string;
   projectSettings: string;
   projectGeneral: string;
@@ -568,6 +591,9 @@ export interface Translations {
   filterLabel: string;
   filterClear: string;
   filterAll: string;
+
+  // Column times
+  columnTimesTitle: string;
 
   // Due dates
   dueDate: string;
@@ -677,6 +703,10 @@ export interface Translations {
   emailMention: string;
   emailStatusChange: string;
 
+  // Pipeline step
+  pipelineStep: string;
+  viewSite: string;
+
   // Project Setup
   setupTitle: string;
   setupRepoDesc: string;
@@ -702,6 +732,11 @@ export interface Translations {
   setupSkipDeploy: string;
   setupConfigureDeploy: string;
   setupProjectNotConfigured: string;
+  compareBtn: string;
+  compareBefore: string;
+  compareAfter: string;
+  compareTitle: string;
+  compareNoProductionUrl: string;
 }
 
 export const translations: Record<Lang, Translations> = {
@@ -728,6 +763,7 @@ export const translations: Record<Lang, Translations> = {
     descriptionPlaceholder: 'Décrivez ce que l\'IA doit faire...',
     aiModelLabel: 'Modèle IA',
     cancel: 'Annuler',
+    continueBtn: 'Continuer',
     create: 'Créer',
     creating: 'Création...',
 
@@ -1082,6 +1118,23 @@ export const translations: Record<Lang, Translations> = {
     settingsBranchMaxLength: 'Max longueur branche',
     settingsBranchMaxLengthDesc: 'Longueur max du nom de branche généré',
 
+    settingsCatAutoRepo: 'Repo Git auto',
+    settingsAutoRepoEnabled: 'Auto-repo activé',
+    settingsAutoRepoEnabledDesc: 'Créer un repo GitHub automatiquement à la création de projet',
+    settingsAutoRepoDefaultPrivate: 'Repos privés',
+    settingsAutoRepoDefaultPrivateDesc: 'Les repos auto sont créés en privé par défaut',
+    autoRepoCreating: 'Création du repo GitHub...',
+    autoRepoSuccess: 'Repo GitHub créé !',
+    autoRepoFailed: 'Échec création auto du repo',
+    autoRepoManualSetup: 'Configurable manuellement dans les paramètres du projet',
+    repoOptionAuto: 'Créer un repo GitHub',
+    repoOptionAutoDesc: 'Un repo sera créé automatiquement',
+    repoOptionManual: 'Configurer plus tard',
+    repoOptionManualDesc: 'Connecter un repo existant après la création',
+    repoOptionNone: 'Sans repo',
+    repoOptionNoneDesc: 'Configurer le repo manuellement plus tard',
+    repoSetupLabel: 'Dépôt Git',
+
     settingsQueuePolling: 'Polling queue (ms)',
     settingsQueuePollingDesc: 'Intervalle de vérification de la queue de dépendances',
     settingsTestMultiplier: 'Tests par fichier',
@@ -1138,6 +1191,10 @@ export const translations: Record<Lang, Translations> = {
     projectDescription: 'Description',
     projectPrivate: 'Privé',
     projectCollaborative: 'Collaboratif',
+    projectConnectRepo: 'Se connecter à un repo existant',
+    projectConnectRepoDesc: 'GitHub / GitLab / Bitbucket · Base de données non incluse · Déploiement serveur non inclus',
+    projectNewComplete: 'Nouveau projet complet',
+    projectNewCompleteDesc: 'Aucun code de départ · Base de données créée · Déploiement serveur compris',
     projectDefaultRepo: 'Dépôt par défaut',
     projectSettings: 'Paramètres du projet',
     projectGeneral: 'Général',
@@ -1220,6 +1277,8 @@ export const translations: Record<Lang, Translations> = {
     filterLabel: 'Label',
     filterClear: 'Effacer les filtres',
     filterAll: 'Tous',
+
+    columnTimesTitle: 'Temps par colonne',
 
     dueDate: 'Échéance',
     dueDateSet: 'Définir une échéance',
@@ -1314,6 +1373,9 @@ export const translations: Record<Lang, Translations> = {
     emailMention: 'Notifier par email en cas de mention',
     emailStatusChange: 'Notifier par email en cas de changement de statut',
 
+    pipelineStep: 'Étape',
+    viewSite: 'Voir le site',
+
     setupTitle: 'Configurer le projet',
     setupRepoDesc: 'Connectez un dépôt Git pour activer la pipeline IA.',
     setupConnectExisting: 'Connecter un repo',
@@ -1338,6 +1400,11 @@ export const translations: Record<Lang, Translations> = {
     setupSkipDeploy: 'Passer cette étape',
     setupConfigureDeploy: 'Configurer',
     setupProjectNotConfigured: 'Projet non configuré',
+    compareBtn: 'Comparer',
+    compareBefore: 'Avant (Production)',
+    compareAfter: 'Après (Preview)',
+    compareTitle: 'Comparaison avant / après',
+    compareNoProductionUrl: 'URL de production non configurée',
   },
   en: {
     credit: 'Credit',
@@ -1362,6 +1429,7 @@ export const translations: Record<Lang, Translations> = {
     descriptionPlaceholder: 'Describe what the AI should do...',
     aiModelLabel: 'AI Model',
     cancel: 'Cancel',
+    continueBtn: 'Continue',
     create: 'Create',
     creating: 'Creating...',
 
@@ -1716,6 +1784,23 @@ export const translations: Record<Lang, Translations> = {
     settingsBranchMaxLength: 'Max branch name length',
     settingsBranchMaxLengthDesc: 'Maximum length of generated branch names',
 
+    settingsCatAutoRepo: 'Auto Git Repo',
+    settingsAutoRepoEnabled: 'Auto-repo enabled',
+    settingsAutoRepoEnabledDesc: 'Automatically create a GitHub repo when a project is created',
+    settingsAutoRepoDefaultPrivate: 'Private repos',
+    settingsAutoRepoDefaultPrivateDesc: 'Auto repos are created as private by default',
+    autoRepoCreating: 'Creating GitHub repo...',
+    autoRepoSuccess: 'GitHub repo created!',
+    autoRepoFailed: 'Auto-repo creation failed',
+    autoRepoManualSetup: 'You can configure it manually in project settings',
+    repoOptionAuto: 'Create a GitHub repo',
+    repoOptionAutoDesc: 'A repo will be created automatically',
+    repoOptionManual: 'Configure later',
+    repoOptionManualDesc: 'Connect an existing repo after creation',
+    repoOptionNone: 'No repo',
+    repoOptionNoneDesc: 'Configure the repo manually later',
+    repoSetupLabel: 'Git Repository',
+
     settingsQueuePolling: 'Queue polling (ms)',
     settingsQueuePollingDesc: 'Dependency queue check interval',
     settingsTestMultiplier: 'Tests per file',
@@ -1772,6 +1857,10 @@ export const translations: Record<Lang, Translations> = {
     projectDescription: 'Description',
     projectPrivate: 'Private',
     projectCollaborative: 'Collaborative',
+    projectConnectRepo: 'Connect to an existing repo',
+    projectConnectRepoDesc: 'GitHub / GitLab / Bitbucket · Database not included · Server deployment not included',
+    projectNewComplete: 'New complete project',
+    projectNewCompleteDesc: 'No starter code · Database created · Server deployment included',
     projectDefaultRepo: 'Default repository',
     projectSettings: 'Project settings',
     projectGeneral: 'General',
@@ -1854,6 +1943,8 @@ export const translations: Record<Lang, Translations> = {
     filterLabel: 'Label',
     filterClear: 'Clear filters',
     filterAll: 'All',
+
+    columnTimesTitle: 'Time per column',
 
     dueDate: 'Due date',
     dueDateSet: 'Set due date',
@@ -1948,6 +2039,9 @@ export const translations: Record<Lang, Translations> = {
     emailMention: 'Email notification on mention',
     emailStatusChange: 'Email notification on status change',
 
+    pipelineStep: 'Step',
+    viewSite: 'View site',
+
     setupTitle: 'Configure project',
     setupRepoDesc: 'Connect a Git repository to enable the AI pipeline.',
     setupConnectExisting: 'Connect a repo',
@@ -1972,5 +2066,10 @@ export const translations: Record<Lang, Translations> = {
     setupSkipDeploy: 'Skip this step',
     setupConfigureDeploy: 'Configure',
     setupProjectNotConfigured: 'Project not configured',
+    compareBtn: 'Compare',
+    compareBefore: 'Before (Production)',
+    compareAfter: 'After (Preview)',
+    compareTitle: 'Before / After Comparison',
+    compareNoProductionUrl: 'Production URL not configured',
   },
 };

@@ -277,6 +277,14 @@ function migrate(): void {
       reset_at INTEGER NOT NULL,
       updated_at TEXT DEFAULT (datetime('now'))
     );
+
+    CREATE TABLE IF NOT EXISTS kanban_status_transitions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      ticket_id INTEGER NOT NULL REFERENCES kanban_tickets(id) ON DELETE CASCADE,
+      from_status TEXT,
+      to_status TEXT NOT NULL,
+      changed_at TEXT DEFAULT (datetime('now'))
+    );
   `);
 
   // ── Indexes ──
@@ -316,6 +324,9 @@ function migrate(): void {
   try {
     db.exec("CREATE INDEX IF NOT EXISTS idx_rate_limit_reset_at ON kanban_rate_limit_hits(reset_at)");
   } catch { /* index may already exist */ }
+  try {
+    db.exec("CREATE INDEX IF NOT EXISTS idx_status_transitions_ticket ON kanban_status_transitions(ticket_id)");
+  } catch { /* index may already exist */ }
 
   // ── Column migrations for existing DBs ──
 
@@ -335,6 +346,9 @@ function migrate(): void {
   }
   if (ticketCols.length > 0 && !ticketColNames.includes('position')) {
     db.exec("ALTER TABLE kanban_tickets ADD COLUMN position INTEGER DEFAULT 0");
+  }
+  if (ticketCols.length > 0 && !ticketColNames.includes('pipeline_step')) {
+    db.exec("ALTER TABLE kanban_tickets ADD COLUMN pipeline_step INTEGER DEFAULT 0");
   }
 
   const authCols = db.prepare("PRAGMA table_info(auth_users)").all() as { name: string }[];

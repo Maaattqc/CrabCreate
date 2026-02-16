@@ -53,6 +53,10 @@ STAGING_BASE_URL=https://staging.mysite.com
 
 # Ngrok (pour webhooks)
 NGROK_URL=
+
+# Auto-repo GitHub (creation auto de repos a la creation de projet)
+AUTO_REPO_GITHUB_TOKEN=ghp_xxx
+AUTO_REPO_GITHUB_OWNER=mon-org
 ```
 
 ## Commandes

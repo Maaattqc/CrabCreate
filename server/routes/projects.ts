@@ -1,9 +1,11 @@
 import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
+import rateLimit from 'express-rate-limit';
 import * as repo from '../db/repositories';
 import { validate } from '../middleware/validate';
 import { requireProject, requireProjectRole } from '../middleware/project';
 import { checkProjectLimit, checkMemberLimit } from '../middleware/plan-limit';
+import { createRateLimitStore } from '../middleware/rate-limit-store';
 import { hasMinRole } from '../permissions';
 import { isAllowedProjectRepoId } from '../security/project-repo';
 import {
@@ -14,9 +16,27 @@ import {
   transferOwnershipSchema,
 } from '../schemas';
 import { emitProjectUpdated } from '../socket';
+import { isAutoRepoConfigured, autoCreateRepo } from '../services/auto-repo';
 import type { ProjectRole } from '../types';
 
 const router = Router();
+
+const projectCreateLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000, // 10 minutes
+  limit: 5,
+  store: createRateLimitStore('project_create'),
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  keyGenerator: (req: Request) => `${req.user?.userId ?? 'anonymous'}`,
+  message: { error: 'Too many projects created. Try again later.' },
+});
+
+// ── Auto-repo status ─────────────────────────────────────────────────────────
+
+// GET /api/projects/auto-repo-status — check if auto-repo is available
+router.get('/auto-repo-status', (req: Request, res: Response) => {
+  res.json({ available: isAutoRepoConfigured() });
+});
 
 // ── Project CRUD ────────────────────────────────────────────────────────────
 
@@ -27,7 +47,7 @@ router.get('/', (req: Request, res: Response) => {
 });
 
 // POST /api/projects — create a project
-router.post('/', validate(createProjectSchema), checkProjectLimit, (req: Request, res: Response) => {
+router.post('/', projectCreateLimiter, validate(createProjectSchema), checkProjectLimit, async (req: Request, res: Response) => {
   const { name, description, slug, is_private } = req.body;
   const userId = req.user!.userId;
 
@@ -35,7 +55,7 @@ router.post('/', validate(createProjectSchema), checkProjectLimit, (req: Request
   // Project-specific repos are attached only via the setup flow (proj-{projectId}).
   const requestedDefaultRepo = typeof req.body.default_repo === 'string'
     ? req.body.default_repo.trim()
-    : 'main-site';
+    : '';
   if (requestedDefaultRepo && requestedDefaultRepo !== 'main-site') {
     res.status(400).json({ error: 'Invalid default_repo: use project setup to connect a repository' });
     return;
@@ -48,16 +68,37 @@ router.post('/', validate(createProjectSchema), checkProjectLimit, (req: Request
     return;
   }
 
-  const project = repo.createProject(name, description, slug, userId, is_private, 'main-site');
+  // Create project — no repo by default, setup_completed = 1 (ready to use)
+  const project = repo.createProject(name, description, slug, userId, is_private, requestedDefaultRepo);
+  repo.updateProjectSetup(project.id, true);
   repo.insertAuditLog(userId, req.user!.email, 'project_create', 'project', project.id, name);
-  res.status(201).json({ ...project, role: 'owner' as ProjectRole });
+
+  // Auto-repo: create a GitHub repo if explicitly requested
+  const wantsAutoRepo = req.body.auto_repo === true;
+  let autoRepoResult: { success: boolean; webUrl?: string; error?: string } | null = null;
+  if (wantsAutoRepo && isAutoRepoConfigured()) {
+    autoRepoResult = await autoCreateRepo(project.id, slug, is_private === 1);
+    if (autoRepoResult.success) {
+      repo.insertAuditLog(userId, req.user!.email, 'auto_repo_create', 'project', project.id, slug);
+    }
+  }
+
+  const updatedProject = repo.findProjectById(project.id) || project;
+  res.status(201).json({
+    ...updatedProject,
+    role: 'owner' as ProjectRole,
+    autoRepoCreated: autoRepoResult?.success ?? false,
+    autoRepoWebUrl: autoRepoResult?.webUrl,
+    autoRepoError: autoRepoResult?.error,
+  });
 });
 
 // GET /api/projects/:id — project details (requires membership)
 router.get('/:id', requireProject, (req: Request, res: Response) => {
   const project = repo.findProjectById(req.project!.id);
   if (!project) { res.status(404).json({ error: 'Project not found' }); return; }
-  res.json({ ...project, role: req.project!.userRole });
+  const deployConfig = repo.findDeployConfigByProject(req.project!.id);
+  res.json({ ...project, role: req.project!.userRole, cf_site_url: deployConfig?.cf_site_url || null });
 });
 
 // PUT /api/projects/:id — update project (admin+)

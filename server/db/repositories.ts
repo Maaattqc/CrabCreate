@@ -148,6 +148,9 @@ export function createTicket(data: Partial<Ticket>, userId?: number, projectId?:
   db.prepare("UPDATE kanban_tickets SET position = ? WHERE id = ?").run(nextPos, ticket.id);
   ticket.position = nextPos;
 
+  // Record initial status transition
+  insertStatusTransition(ticket.id, null, ticket.status || 'backlog');
+
   return ticket;
 }
 
@@ -175,7 +178,7 @@ export function updateTicket(id: number, fields: Record<string, any>, modifiedBy
     'repo', 'assignee', 'complexity', 'target_files', 'tags', 'depends_on',
     'branch_name', 'pr_url', 'pr_id', 'staging_url', 'lines_added', 'lines_removed',
     'tokens_used', 'cost_usd', 'ai_review_score', 'ai_review_data', 'test_results', 'progress', 'position',
-    'due_date',
+    'due_date', 'pipeline_step',
   ];
 
   const updates: string[] = [];
@@ -191,6 +194,14 @@ export function updateTicket(id: number, fields: Record<string, any>, modifiedBy
   }
 
   if (updates.length === 0) return undefined;
+
+  // Record status transition if status is changing
+  if (fields.status !== undefined) {
+    const current = db.prepare('SELECT status FROM kanban_tickets WHERE id = ?').get(id) as { status: string } | undefined;
+    if (current && current.status !== fields.status) {
+      insertStatusTransition(id, current.status, fields.status);
+    }
+  }
 
   updates.push("updated_at = datetime('now')");
   if (modifiedBy !== undefined) {
@@ -208,7 +219,11 @@ export function deleteTicket(id: number): void {
 }
 
 export function updateTicketStatus(id: number, status: string, progress: number): void {
+  const current = db.prepare('SELECT status FROM kanban_tickets WHERE id = ?').get(id) as { status: string } | undefined;
   db.prepare("UPDATE kanban_tickets SET status = ?, progress = ?, updated_at = datetime('now') WHERE id = ?").run(status, progress, id);
+  if (current && current.status !== status) {
+    insertStatusTransition(id, current.status, status);
+  }
 }
 
 const TICKET_UPDATABLE_FIELDS = new Set([
@@ -216,6 +231,7 @@ const TICKET_UPDATABLE_FIELDS = new Set([
   'repo', 'assignee', 'complexity', 'target_files', 'tags', 'depends_on',
   'branch_name', 'pr_url', 'pr_id', 'staging_url', 'lines_added', 'lines_removed',
   'tokens_used', 'cost_usd', 'ai_review_score', 'ai_review_data', 'test_results', 'progress',
+  'pipeline_step',
 ]);
 
 export function updateTicketFields(id: number, fields: Record<string, any>): void {
@@ -230,6 +246,14 @@ export function updateTicketFields(id: number, fields: Record<string, any>): voi
 
   if (updates.length === 0) return;
 
+  // Record status transition if status is changing
+  if (fields.status !== undefined) {
+    const current = db.prepare('SELECT status FROM kanban_tickets WHERE id = ?').get(id) as { status: string } | undefined;
+    if (current && current.status !== fields.status) {
+      insertStatusTransition(id, current.status, fields.status);
+    }
+  }
+
   updates.push("updated_at = datetime('now')");
   values.push(id);
 
@@ -238,6 +262,40 @@ export function updateTicketFields(id: number, fields: Record<string, any>): voi
 
 export function findQueuedTickets(): Ticket[] {
   return db.prepare("SELECT * FROM kanban_tickets WHERE status = 'queued' ORDER BY priority DESC, created_at ASC").all() as Ticket[];
+}
+
+// ── Status Transitions ──────────────────────────────────────────────────────
+
+export function insertStatusTransition(ticketId: number, fromStatus: string | null, toStatus: string): void {
+  db.prepare(
+    'INSERT INTO kanban_status_transitions (ticket_id, from_status, to_status) VALUES (?, ?, ?)'
+  ).run(ticketId, fromStatus, toStatus);
+}
+
+export function findStatusTransitions(ticketId: number): { id: number; from_status: string | null; to_status: string; changed_at: string }[] {
+  return db.prepare(
+    'SELECT * FROM kanban_status_transitions WHERE ticket_id = ? ORDER BY changed_at ASC'
+  ).all(ticketId) as { id: number; from_status: string | null; to_status: string; changed_at: string }[];
+}
+
+export function computeColumnTimes(ticketId: number): { status: string; duration_seconds: number }[] {
+  const transitions = findStatusTransitions(ticketId);
+  if (transitions.length === 0) return [];
+
+  const durations: Record<string, number> = {};
+  const now = new Date();
+
+  for (let i = 0; i < transitions.length; i++) {
+    const status = transitions[i].to_status;
+    const enteredAt = new Date(transitions[i].changed_at + 'Z');
+    const exitedAt = i + 1 < transitions.length
+      ? new Date(transitions[i + 1].changed_at + 'Z')
+      : now;
+    const seconds = Math.max(0, Math.floor((exitedAt.getTime() - enteredAt.getTime()) / 1000));
+    durations[status] = (durations[status] || 0) + seconds;
+  }
+
+  return Object.entries(durations).map(([status, duration_seconds]) => ({ status, duration_seconds }));
 }
 
 // ── Logs ─────────────────────────────────────────────────────────────────────
@@ -691,9 +749,10 @@ export function findProjectById(id: number): Project | undefined {
 
 export function findProjectsByUserId(userId: number): ProjectWithRole[] {
   return db.prepare(`
-    SELECT p.*, pm.role
+    SELECT p.*, pm.role, dc.cf_site_url
     FROM kanban_projects p
     INNER JOIN kanban_project_members pm ON p.id = pm.project_id
+    LEFT JOIN kanban_deploy_configs dc ON p.id = dc.project_id
     WHERE pm.user_id = ?
     ORDER BY p.updated_at DESC
   `).all(userId) as ProjectWithRole[];

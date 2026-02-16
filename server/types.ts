@@ -28,6 +28,7 @@ export interface Ticket {
   ai_review_data: string | null;
   test_results: string | null;
   progress: number;
+  pipeline_step: number;
   position: number;
   user_id: number | null;
   project_id: number | null;

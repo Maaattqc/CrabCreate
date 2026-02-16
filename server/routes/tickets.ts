@@ -61,7 +61,7 @@ function resolveProjectRepo(projectId: number, requestedRepo: unknown): string |
   if (typeof requestedRepo !== 'string') return null;
 
   const normalized = requestedRepo.trim();
-  if (!normalized) return projectRepoId;
+  if (!normalized || normalized === 'main-site') return projectRepoId;
   return normalized === projectRepoId ? projectRepoId : null;
 }
 
@@ -243,6 +243,14 @@ router.get('/:id/activity', (req: Request, res: Response) => {
   if (!repo.isTicketInProject(ticketId, req.project!.id)) return res.status(403).json({ error: 'Access denied' });
   const activity = repo.findActivityByTicketId(ticketId);
   res.json(activity);
+});
+
+// GET /api/tickets/:id/column-times
+router.get('/:id/column-times', (req: Request, res: Response) => {
+  const ticketId = Number(req.params.id);
+  if (!repo.isTicketInProject(ticketId, req.project!.id)) return res.status(403).json({ error: 'Access denied' });
+  const times = repo.computeColumnTimes(ticketId);
+  res.json(times);
 });
 
 // GET /api/tickets/:id/diff

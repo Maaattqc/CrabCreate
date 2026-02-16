@@ -10,7 +10,7 @@ interface ProjectContextType {
   invitations: ProjectInvitation[];
   loading: boolean;
   switchProject: (project: Project) => void;
-  createProject: (data: { name: string; slug: string; description?: string; is_private?: number; default_repo?: string }) => Promise<Project>;
+  createProject: (data: { name: string; slug: string; description?: string; is_private?: number; default_repo?: string; auto_repo?: boolean }) => Promise<Project & { autoRepoCreated?: boolean; autoRepoWebUrl?: string; autoRepoError?: string }>;
   updateProject: (id: number, data: Partial<Pick<Project, 'name' | 'description' | 'is_private' | 'default_repo' | 'cursors_enabled' | 'presence_enabled' | 'presence_max_visible'>>) => Promise<Project>;
   deleteProject: (id: number) => Promise<void>;
   refreshProjects: () => Promise<void>;
@@ -25,8 +25,8 @@ const ProjectContext = createContext<ProjectContextType>({
   invitations: [],
   loading: true,
   switchProject: () => {},
-  createProject: async () => ({ id: 0, name: '', description: '', slug: '', owner_id: 0, is_private: 1, default_repo: '', setup_completed: 0, cursors_enabled: 1, presence_enabled: 1, presence_max_visible: 5, role: 'owner', created_at: '', updated_at: '' }),
-  updateProject: async () => ({ id: 0, name: '', description: '', slug: '', owner_id: 0, is_private: 1, default_repo: '', setup_completed: 0, cursors_enabled: 1, presence_enabled: 1, presence_max_visible: 5, role: 'owner', created_at: '', updated_at: '' }),
+  createProject: async () => ({ id: 0, name: '', description: '', slug: '', owner_id: 0, is_private: 1, default_repo: '', setup_completed: 0, cursors_enabled: 1, presence_enabled: 1, presence_max_visible: 5, cf_site_url: null, role: 'owner', created_at: '', updated_at: '' }),
+  updateProject: async () => ({ id: 0, name: '', description: '', slug: '', owner_id: 0, is_private: 1, default_repo: '', setup_completed: 0, cursors_enabled: 1, presence_enabled: 1, presence_max_visible: 5, cf_site_url: null, role: 'owner', created_at: '', updated_at: '' }),
   deleteProject: async () => {},
   refreshProjects: async () => {},
   refreshInvitations: async () => {},
@@ -132,11 +132,11 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('crab-current-project', String(project.id));
   }, []);
 
-  const createProjectFn = useCallback(async (data: { name: string; slug: string; description?: string; is_private?: number; default_repo?: string }) => {
-    const project = await projectsApi.createProject(data);
-    setProjects(prev => [project, ...prev]);
-    switchProject(project);
-    return project;
+  const createProjectFn = useCallback(async (data: { name: string; slug: string; description?: string; is_private?: number; default_repo?: string; auto_repo?: boolean }) => {
+    const result = await projectsApi.createProject(data);
+    setProjects(prev => [result, ...prev]);
+    switchProject(result);
+    return result;
   }, [switchProject]);
 
   const updateProjectFn = useCallback(async (id: number, data: Partial<Pick<Project, 'name' | 'description' | 'is_private' | 'default_repo' | 'cursors_enabled' | 'presence_enabled' | 'presence_max_visible'>>) => {
