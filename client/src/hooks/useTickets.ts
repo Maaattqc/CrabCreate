@@ -76,6 +76,15 @@ export function useTickets() {
     await fetchTickets();
   };
 
+  const archive = async (id: number): Promise<void> => {
+    await api.archiveTicket(id);
+    setTickets(prev => prev.filter(t => t.id !== id));
+  };
+
+  const unarchive = async (id: number): Promise<void> => {
+    await api.unarchiveTicket(id);
+  };
+
   // Full reload with loading state (for project switch)
   const resetAndFetch = useCallback(async () => {
     initialLoadDone.current = false;
@@ -126,7 +135,7 @@ export function useTickets() {
   return {
     tickets, loading, filters, setFilters,
     fetchTickets, resetAndFetch, create, update, remove,
-    launch, approve, reject, retry, rollback,
+    launch, approve, reject, retry, rollback, archive, unarchive,
     updateTicketInState, insertLocalTicket, removeLocalTicket, reorder, clearTickets,
   };
 }

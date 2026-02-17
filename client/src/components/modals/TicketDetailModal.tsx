@@ -322,7 +322,7 @@ export default function TicketDetailModal({ ticket, initialTab, onClose, onAppro
             )}
             {ticket.cost_usd > 0 && (
               <span className="text-[11px] text-tx-faint bg-subtle px-2.5 py-1 rounded-md font-mono">
-                ${ticket.cost_usd.toFixed(4)}
+                {ticket.cost_usd.toFixed(4)}$
               </span>
             )}
             {ticket.tokens_used > 0 && (
@@ -527,11 +527,6 @@ export default function TicketDetailModal({ ticket, initialTab, onClose, onAppro
                   <ExternalLink size={14} /> Staging
                 </a>
               )}
-              {ticket.pr_url && !ticket.pr_url.startsWith('#') && (
-                <a href={ticket.pr_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-4 py-2 bg-purple-500/15 text-purple-400 text-sm font-medium rounded-lg hover:bg-purple-500/25 border border-purple-500/20 transition-all">
-                  <ExternalLink size={14} /> PR
-                </a>
-              )}
               {previewUrl && previewUrl !== '#simulation' && (
                 <button
                   onClick={() => setShowCompare(!showCompare)}
@@ -562,11 +557,6 @@ export default function TicketDetailModal({ ticket, initialTab, onClose, onAppro
               {ticket.staging_url && ticket.staging_url !== '#simulation' && (
                 <a href={ticket.staging_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-4 py-2 bg-blue-500/15 text-blue-400 text-sm font-medium rounded-lg hover:bg-blue-500/25 border border-blue-500/20 transition-all">
                   <ExternalLink size={14} /> {t.viewSite}
-                </a>
-              )}
-              {ticket.pr_url && !ticket.pr_url.startsWith('#') && (
-                <a href={ticket.pr_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-4 py-2 bg-purple-500/15 text-purple-400 text-sm font-medium rounded-lg hover:bg-purple-500/25 border border-purple-500/20 transition-all">
-                  <ExternalLink size={14} /> PR
                 </a>
               )}
               <button onClick={() => onRollback(ticket.id)} className="flex items-center gap-2 px-4 py-2 bg-amber-500/15 text-amber-400 text-sm font-medium rounded-lg hover:bg-amber-500/25 border border-amber-500/20 transition-all">

@@ -51,6 +51,10 @@ export const deleteTicket = (id: number): Promise<void> => projectRequest<void>(
   method: 'DELETE',
 });
 
+// Archive (project-scoped)
+export const archiveTicket = (id: number): Promise<{ success: boolean }> => projectRequest<{ success: boolean }>(`${API}/tickets/${id}/archive`, { method: 'POST' });
+export const unarchiveTicket = (id: number): Promise<{ success: boolean }> => projectRequest<{ success: boolean }>(`${API}/tickets/${id}/unarchive`, { method: 'POST' });
+
 // Pipeline (project-scoped)
 export const launchPipeline = (id: number): Promise<Ticket> => projectRequest<Ticket>(`${API}/pipeline/launch/${id}`, { method: 'POST' });
 export const approveTicket = (id: number): Promise<Ticket> => projectRequest<Ticket>(`${API}/pipeline/approve/${id}`, { method: 'POST' });

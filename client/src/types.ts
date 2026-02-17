@@ -23,6 +23,7 @@ export interface Ticket {
   pipeline_step: number;
   position: number;
   due_date: string | null;
+  archived_at: string | null;
   branch_name: string;
   pr_url: string;
   pr_id: number;

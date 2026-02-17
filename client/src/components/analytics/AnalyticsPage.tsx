@@ -28,7 +28,7 @@ export default function AnalyticsPage() {
   const statCards: StatCard[] = [
     { label: 'Total tickets', value: data.total, icon: FileText, color: '#94a3b8' },
     { label: 'Tokens utilisés', value: data.tokensTotal.toLocaleString(), icon: Zap, color: '#eab308' },
-    { label: 'Coût total', value: `$${data.costTotal}`, icon: Coins, color: '#22c55e' },
+    { label: 'Coût total', value: `${data.costTotal}$`, icon: Coins, color: '#22c55e' },
     { label: 'Lignes ajoutées', value: `+${data.linesAdded.toLocaleString()}`, icon: Code, color: '#22c55e' },
     { label: 'Lignes supprimées', value: `-${data.linesRemoved.toLocaleString()}`, icon: Code, color: '#ef4444' },
     { label: 'Score moyen', value: `${data.avgScore}/100`, icon: BarChart3, color: '#a855f7' },

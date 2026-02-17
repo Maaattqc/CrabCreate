@@ -80,6 +80,7 @@ router.get('/', (req: Request, res: Response) => {
   if (stringParam(q.assignee)) filters.assignee = stringParam(q.assignee)!;
   if (stringParam(q.tag)) filters.tag = stringParam(q.tag)!;
   if (stringParam(q.search)) filters.search = stringParam(q.search)!;
+  if (stringParam(q.archived)) filters.archived = stringParam(q.archived)!;
   const projectId = req.project!.id;
   const limit = Math.min(Number(req.query.limit) || 500, 500);
   const offset = Math.max(Number(req.query.offset) || 0, 0);
@@ -226,6 +227,40 @@ router.delete('/:id', (req: Request, res: Response) => {
   emitNotification(`Ticket #${ticketId} supprimé`, 'warning', req.project!.id);
   emitTicketUpdated(ticketId, {}, req.project!.id);
   dispatchWebhooks(req.project!.id, 'ticket:deleted', { ticketId }).catch(() => {});
+  res.json({ success: true });
+});
+
+// POST /api/tickets/:id/archive -- Archive ticket
+router.post('/:id/archive', (req: Request, res: Response) => {
+  const ticketId = Number(req.params.id);
+  const ticket = repo.findTicketById(ticketId);
+  if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
+  if (ticket.project_id !== req.project!.id) return res.status(403).json({ error: 'Access denied' });
+  if (!canModifyTicket(ticket, req.user!.userId, req.project!.userRole)) {
+    return res.status(403).json({ error: 'Access denied' });
+  }
+
+  repo.archiveTicket(ticketId);
+  repo.insertActivity(ticketId, `Ticket #${ticketId} archivé`, 'archive');
+  repo.insertAuditLog(req.user!.userId, req.user!.email, 'ticket_archive', 'ticket', ticketId);
+  emitTicketUpdated(ticketId, { archived_at: new Date().toISOString() }, req.project!.id);
+  res.json({ success: true });
+});
+
+// POST /api/tickets/:id/unarchive -- Unarchive ticket
+router.post('/:id/unarchive', (req: Request, res: Response) => {
+  const ticketId = Number(req.params.id);
+  const ticket = repo.findTicketById(ticketId);
+  if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
+  if (ticket.project_id !== req.project!.id) return res.status(403).json({ error: 'Access denied' });
+  if (!canModifyTicket(ticket, req.user!.userId, req.project!.userRole)) {
+    return res.status(403).json({ error: 'Access denied' });
+  }
+
+  repo.unarchiveTicket(ticketId);
+  repo.insertActivity(ticketId, `Ticket #${ticketId} désarchivé`, 'unarchive');
+  repo.insertAuditLog(req.user!.userId, req.user!.email, 'ticket_unarchive', 'ticket', ticketId);
+  emitTicketUpdated(ticketId, { archived_at: null }, req.project!.id);
   res.json({ success: true });
 });
 

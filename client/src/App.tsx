@@ -9,6 +9,7 @@ import CalendarView from './components/board/CalendarView';
 import TimelineView from './components/board/TimelineView';
 import CreateTicketModal from './components/modals/CreateTicketModal';
 import TicketDetailModal from './components/modals/TicketDetailModal';
+import ReviewCompareModal from './components/modals/ReviewCompareModal';
 import CreateProjectModal from './components/modals/CreateProjectModal';
 import ProjectSettingsModal from './components/modals/ProjectSettingsModal';
 import InvitationsModal from './components/modals/InvitationsModal';
@@ -104,6 +105,7 @@ function Dashboard() {
   const [showCreate, setShowCreate] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [selectedTicketTab, setSelectedTicketTab] = useState<string | undefined>(undefined);
+  const [reviewTicket, setReviewTicket] = useState<Ticket | null>(null);
   const [showCmd, setShowCmd] = useState(false);
   const [showCreateProject, setShowCreateProject] = useState(false);
   const [showProjectSettings, setShowProjectSettings] = useState(false);
@@ -144,7 +146,7 @@ function Dashboard() {
   }, []);
 
   const { cursors, presence, sendCursorMove, sendCursorLeave } = useCursors();
-  const { tickets, fetchTickets, resetAndFetch, create, remove, launch, approve, reject, retry, rollback, updateTicketInState, insertLocalTicket, removeLocalTicket, reorder, clearTickets } = useTickets();
+  const { tickets, fetchTickets, resetAndFetch, create, remove, launch, approve, reject, retry, rollback, archive, unarchive, updateTicketInState, insertLocalTicket, removeLocalTicket, reorder, clearTickets } = useTickets();
   const { notifications, addNotification, removeNotification } = useNotifications(appConfig.notification_timeout_ms);
   const { on, off, emit } = useSocket();
   const { t } = useLanguage();
@@ -175,6 +177,16 @@ function Dashboard() {
     prevProjectRef.current = currentProject?.id ?? null;
   }, [currentProject?.id, emit]);
 
+  // Keep reviewTicket in sync with latest tickets data (e.g. staging_url from pipeline)
+  useEffect(() => {
+    if (reviewTicket) {
+      const fresh = tickets.find(t => t.id === reviewTicket.id);
+      if (fresh && fresh.staging_url !== reviewTicket.staging_url) {
+        setReviewTicket(fresh);
+      }
+    }
+  }, [tickets, reviewTicket]);
+
   useEffect(() => {
     on('notification', (data: { message: string; type: 'success' | 'warning' | 'error' | 'info' }) => {
       addNotification(data.message, data.type);
@@ -185,7 +197,11 @@ function Dashboard() {
       setSelectedTicket(prev => prev && prev.id === data.ticketId ? { ...prev, status: data.status, progress: data.progress } : prev);
     });
 
-    on('ticket:updated', () => {
+    on('ticket:updated', (data: { ticketId: number } & Partial<Ticket>) => {
+      if (data?.ticketId) {
+        const { ticketId, ...fields } = data;
+        updateTicketInState(ticketId, fields);
+      }
       fetchTickets();
     });
 
@@ -216,7 +232,8 @@ function Dashboard() {
     return t.title.toLowerCase().includes(q) || (t.description || '').toLowerCase().includes(q) || `#${t.id}`.includes(q);
   });
 
-  const handleTicketClick = (ticket: Ticket) => setSelectedTicket(ticket);
+  const handleTicketClick = (ticket: Ticket) => { setSelectedTicket(ticket); };
+  const handleReview = (ticket: Ticket) => { setReviewTicket(ticket); };
 
   // Handle ?checkout=success on dashboard mount
   useEffect(() => {
@@ -284,6 +301,7 @@ function Dashboard() {
       pipeline_step: 0,
       position: 0,
       due_date: null,
+      archived_at: null,
       branch_name: '',
       pr_url: '',
       pr_id: 0,
@@ -375,9 +393,9 @@ function Dashboard() {
         ) : viewMode === 'timeline' ? (
           <TimelineView tickets={filteredTickets} onTicketClick={handleTicketClick} />
         ) : viewMode === 'board' ? (
-          <KanbanBoard tickets={filteredTickets} onTicketClick={handleTicketClick} onLaunch={handleLaunch} onCreateClick={() => { if (!user || user.isVisitor) { openLogin(); return; } setShowCreate(true); }} onReorder={reorder} hideEmptyCTA={showOnboarding} />
+          <KanbanBoard tickets={filteredTickets} onTicketClick={handleTicketClick} onLaunch={handleLaunch} onArchive={archive} onReview={handleReview} onCreateClick={() => { if (!user || user.isVisitor) { openLogin(); return; } setShowCreate(true); }} onReorder={reorder} hideEmptyCTA={showOnboarding} />
         ) : (
-          <ListView tickets={filteredTickets} onTicketClick={handleTicketClick} scoreThresholdGood={appConfig.score_threshold_good} scoreThresholdOk={appConfig.score_threshold_ok} />
+          <ListView tickets={filteredTickets} onTicketClick={handleTicketClick} onArchive={archive} onUnarchive={unarchive} scoreThresholdGood={appConfig.score_threshold_good} scoreThresholdOk={appConfig.score_threshold_ok} />
         )}
       </div>
 
@@ -404,6 +422,15 @@ function Dashboard() {
           onRetry={async (id: number) => { await retry(id); setSelectedTicket(null); }}
           onRollback={async (id: number) => { await rollback(id); setSelectedTicket(null); }}
           onDelete={async (id: number) => { await remove(id); setSelectedTicket(null); }}
+        />
+      )}
+
+      {reviewTicket && (
+        <ReviewCompareModal
+          ticket={reviewTicket}
+          onClose={() => setReviewTicket(null)}
+          onApprove={async (id: number) => { await approve(id); setReviewTicket(null); }}
+          onReject={async (id: number) => { await reject(id); setReviewTicket(null); }}
         />
       )}
 

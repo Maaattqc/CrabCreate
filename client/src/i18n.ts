@@ -41,6 +41,8 @@ export interface Translations {
   retry: string;
   rollback: string;
   delete: string;
+  archive: string;
+  unarchive: string;
 
   // Tabs
   tabActivity: string;
@@ -666,6 +668,7 @@ export interface Translations {
   historyAll: string;
   historyCompleted: string;
   historyActive: string;
+  historyArchived: string;
   listTitle: string;
   listStatus: string;
   listProgress: string;
@@ -737,6 +740,8 @@ export interface Translations {
   compareAfter: string;
   compareTitle: string;
   compareNoProductionUrl: string;
+  compareNoPreviewUrl: string;
+  viewChanges: string;
 }
 
 export const translations: Record<Lang, Translations> = {
@@ -777,6 +782,8 @@ export const translations: Record<Lang, Translations> = {
     retry: 'Réessayer',
     rollback: 'Annuler',
     delete: 'Supprimer',
+    archive: 'Archiver',
+    unarchive: 'Désarchiver',
 
     tabActivity: 'Suivi',
     tabQuality: 'Qualité',
@@ -1341,6 +1348,7 @@ export const translations: Record<Lang, Translations> = {
     historyAll: 'Tous',
     historyCompleted: 'Terminés',
     historyActive: 'En cours',
+    historyArchived: 'Archivés',
     listTitle: 'Titre',
     listStatus: 'Statut',
     listProgress: 'Progression',
@@ -1405,6 +1413,8 @@ export const translations: Record<Lang, Translations> = {
     compareAfter: 'Après (Preview)',
     compareTitle: 'Comparaison avant / après',
     compareNoProductionUrl: 'URL de production non configurée',
+    compareNoPreviewUrl: 'URL de preview non disponible',
+    viewChanges: 'Voir changements',
   },
   en: {
     credit: 'Credit',
@@ -1443,6 +1453,8 @@ export const translations: Record<Lang, Translations> = {
     retry: 'Retry',
     rollback: 'Rollback',
     delete: 'Delete',
+    archive: 'Archive',
+    unarchive: 'Unarchive',
 
     tabActivity: 'Activity',
     tabQuality: 'Quality',
@@ -2007,6 +2019,7 @@ export const translations: Record<Lang, Translations> = {
     historyAll: 'All',
     historyCompleted: 'Completed',
     historyActive: 'Active',
+    historyArchived: 'Archived',
     listTitle: 'Title',
     listStatus: 'Status',
     listProgress: 'Progress',
@@ -2071,5 +2084,7 @@ export const translations: Record<Lang, Translations> = {
     compareAfter: 'After (Preview)',
     compareTitle: 'Before / After Comparison',
     compareNoProductionUrl: 'Production URL not configured',
+    compareNoPreviewUrl: 'Preview URL not available',
+    viewChanges: 'View changes',
   },
 };

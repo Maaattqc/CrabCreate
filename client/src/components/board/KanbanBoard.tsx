@@ -10,12 +10,14 @@ interface KanbanBoardProps {
   tickets: Ticket[];
   onTicketClick: (t: Ticket) => void;
   onLaunch: (id: number) => void;
+  onArchive?: (id: number) => void;
+  onReview?: (ticket: Ticket) => void;
   onCreateClick: () => void;
   onReorder?: (ticketIds: number[]) => void;
   hideEmptyCTA?: boolean;
 }
 
-export default function KanbanBoard({ tickets, onTicketClick, onLaunch, onCreateClick, onReorder, hideEmptyCTA }: KanbanBoardProps) {
+export default function KanbanBoard({ tickets, onTicketClick, onLaunch, onArchive, onReview, onCreateClick, onReorder, hideEmptyCTA }: KanbanBoardProps) {
   const { viewersMap, getViewers } = useTicketViewers();
   const { isDragging, startDragging, stopDragging } = useDragAwareness();
   const sensors = useSensors(
@@ -112,6 +114,8 @@ export default function KanbanBoard({ tickets, onTicketClick, onLaunch, onCreate
                 tickets={columnTickets}
                 onTicketClick={onTicketClick}
                 onLaunch={onLaunch}
+                onArchive={onArchive}
+                onReview={onReview}
                 onCreateClick={onCreateClick}
                 stepNumber={i + 1}
                 totalTickets={hideEmptyCTA ? -1 : tickets.length}

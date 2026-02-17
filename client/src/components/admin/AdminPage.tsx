@@ -414,7 +414,7 @@ function StatsTab({ stats, t }: { stats: AdminStats; t: any }) {
     { label: t.adminActiveUsers, value: stats.activeUsers, color: 'text-green-400' },
     { label: t.adminBlockedUsers, value: stats.blockedUsers, color: 'text-red-400' },
     { label: t.adminTotalTickets, value: stats.totalTickets, color: 'text-amber-400' },
-    { label: t.adminTotalCost, value: `$${stats.totalCost.toFixed(2)}`, color: 'text-amber-400' },
+    { label: t.adminTotalCost, value: `${stats.totalCost.toFixed(2)}$`, color: 'text-amber-400' },
     { label: t.adminTotalTokens, value: fmt(stats.totalTokens), color: 'text-cyan-400' },
   ];
 

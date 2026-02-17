@@ -60,11 +60,12 @@ import type {
 // ── Tickets ──────────────────────────────────────────────────────────────────
 
 export function findAllTickets(filters: Record<string, string>, userId?: number, projectId?: number, limit = 500, offset = 0): Ticket[] {
+  const showArchived = filters.archived === 'true';
   let sql = `SELECT t.*, uc.email AS creator_email, um.email AS modifier_email
     FROM kanban_tickets t
     LEFT JOIN auth_users uc ON t.user_id = uc.id
     LEFT JOIN auth_users um ON t.last_modified_by = um.id
-    WHERE 1=1`;
+    WHERE ${showArchived ? 't.archived_at IS NOT NULL' : 't.archived_at IS NULL'}`;
   const params: (string | number)[] = [];
 
   if (projectId !== undefined) {
@@ -260,6 +261,14 @@ export function updateTicketFields(id: number, fields: Record<string, any>): voi
   db.prepare(`UPDATE kanban_tickets SET ${updates.join(', ')} WHERE id = ?`).run(...values);
 }
 
+export function archiveTicket(id: number): void {
+  db.prepare("UPDATE kanban_tickets SET archived_at = datetime('now'), updated_at = datetime('now') WHERE id = ?").run(id);
+}
+
+export function unarchiveTicket(id: number): void {
+  db.prepare("UPDATE kanban_tickets SET archived_at = NULL, updated_at = datetime('now') WHERE id = ?").run(id);
+}
+
 export function findQueuedTickets(): Ticket[] {
   return db.prepare("SELECT * FROM kanban_tickets WHERE status = 'queued' ORDER BY priority DESC, created_at ASC").all() as Ticket[];
 }
@@ -313,6 +322,18 @@ export function findLatestDiff(ticketId: number): string | null {
     "SELECT message FROM kanban_logs WHERE ticket_id = ? AND phase = 'coding' AND log_type = 'diff' ORDER BY created_at DESC LIMIT 1"
   ).get(ticketId) as { message: string } | undefined;
   return row ? row.message : null;
+}
+
+export function findCodingFiles(ticketId: number): { path: string; content: string }[] {
+  const row = db.prepare(
+    "SELECT message FROM kanban_logs WHERE ticket_id = ? AND log_type = 'coding_files' ORDER BY created_at DESC LIMIT 1"
+  ).get(ticketId) as { message: string } | undefined;
+  if (!row) return [];
+  try {
+    return JSON.parse(row.message);
+  } catch {
+    return [];
+  }
 }
 
 // ── Chat ─────────────────────────────────────────────────────────────────────

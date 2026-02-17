@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { emitTicketLog, emitTicketStatus, emitNotification } from '../socket';
+import { emitTicketLog, emitTicketStatus, emitTicketUpdated, emitNotification } from '../socket';
 import * as repo from '../db/repositories';
 import * as dependencyChecker from '../services/dependency-checker';
 import * as fileLocker from '../services/file-locker';
@@ -99,86 +99,129 @@ router.post('/launch/:id', checkPipelineLimit, pipelineGuard, async (req: Reques
     }
     repo.updateTicketFields(ticket.id, { pipeline_step: 2 });
 
-    // 3. Complexity estimation
-    repo.updateTicketStatus(ticket.id, 'estimating', 10);
-    emitTicketStatus(ticket.id, 'estimating', 10, projectId);
-    emitTicketLog(ticket.id, 'Estimation de la complexité...', 'info', 'estimating', projectId);
-    repo.insertLog(ticket.id, 'Estimation de la complexité...', 'info', 'estimating');
+    // --- Skip coding shortcut: for testing deploy without AI calls ---
+    const skipCoding = repo.getConfig('skip_coding') === '1';
+    let codingResult: import('../types').CodingResult;
 
-    const estimation = await aiCoder.estimateComplexity(ticket);
-    repo.updateTicketFields(ticket.id, { complexity: estimation.complexity, pipeline_step: 3 });
-    emitTicketLog(ticket.id, `Complexité estimée : ${estimation.complexity}`, 'success', 'estimating', projectId);
-    repo.insertLog(ticket.id, `Complexité estimée : ${estimation.complexity}`, 'success', 'estimating');
-    repo.insertActivity(ticket.id, `Complexité estimée : ${estimation.complexity}`, 'estimate');
+    if (skipCoding) {
+      emitTicketLog(ticket.id, '[TEST] skip_coding=1 — étapes IA ignorées', 'warning', 'estimating', projectId);
+      repo.insertLog(ticket.id, '[TEST] skip_coding=1 — étapes IA ignorées', 'warning', 'estimating');
 
-    // 4. AI Coding
-    repo.updateTicketStatus(ticket.id, 'ai_coding', 25);
-    emitTicketStatus(ticket.id, 'ai_coding', 25, projectId);
-    emitTicketLog(ticket.id, 'Génération du code par IA...', 'info', 'coding', projectId);
-    repo.insertLog(ticket.id, 'Génération du code par IA...', 'info', 'coding');
+      const testHtml = `<!DOCTYPE html>
+<html lang="fr">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Test deploy — Ticket #${ticket.id}</title>
+<style>body{font-family:system-ui,sans-serif;max-width:600px;margin:3rem auto;padding:0 1rem;color:#e4e4e7;background:#18181b}
+h1{color:#f59e0b}code{background:#27272a;padding:2px 6px;border-radius:4px;font-size:0.9em}</style></head>
+<body>
+<h1>CrabCreate — Deploy test</h1>
+<p>Ticket <code>#${ticket.id}</code> — <strong>${ticket.title.replace(/[<>&"]/g, '')}</strong></p>
+<p>Deployed at <code>${new Date().toISOString()}</code></p>
+</body></html>`;
 
-    const codingResult = await aiCoder.generateCode(ticket);
+      codingResult = {
+        files: [{ path: 'index.html', content: testHtml }],
+        summary: 'Test deploy (skip_coding)',
+        diff: '',
+        linesAdded: 10,
+        linesRemoved: 0,
+        tokensUsed: 0,
+        costUsd: 0,
+        branchName: `crab-test-${ticket.id}`,
+        repoDir: '',
+      };
 
-    repo.updateTicketFields(ticket.id, {
-      lines_added: codingResult.linesAdded,
-      lines_removed: codingResult.linesRemoved,
-      tokens_used: codingResult.tokensUsed,
-      cost_usd: codingResult.costUsd,
-      branch_name: codingResult.branchName,
-      progress: 50,
-      pipeline_step: 4,
-    });
+      repo.updateTicketFields(ticket.id, {
+        lines_added: codingResult.linesAdded,
+        complexity: 'test',
+        ai_review_score: 100,
+        progress: 70,
+        pipeline_step: 5,
+      });
+      emitTicketStatus(ticket.id, 'ai_review', 70, projectId);
 
-    // Store diff
-    if (codingResult.diff) {
-      repo.insertLog(ticket.id, codingResult.diff, 'diff', 'coding');
-    }
+    } else {
+      // 3. Complexity estimation
+      repo.updateTicketStatus(ticket.id, 'estimating', 10);
+      emitTicketStatus(ticket.id, 'estimating', 10, projectId);
+      emitTicketLog(ticket.id, 'Estimation de la complexité...', 'info', 'estimating', projectId);
+      repo.insertLog(ticket.id, 'Estimation de la complexité...', 'info', 'estimating');
 
-    emitTicketLog(ticket.id, `Code généré : +${codingResult.linesAdded} -${codingResult.linesRemoved} lignes`, 'success', 'coding', projectId);
-    repo.insertLog(ticket.id, `Code généré : +${codingResult.linesAdded} -${codingResult.linesRemoved} lignes`, 'success', 'coding');
-    repo.insertActivity(ticket.id, `Code généré par ${ticket.ai_model}`, 'ai');
+      const estimation = await aiCoder.estimateComplexity(ticket);
+      repo.updateTicketFields(ticket.id, { complexity: estimation.complexity, pipeline_step: 3 });
+      emitTicketLog(ticket.id, `Complexité estimée : ${estimation.complexity}`, 'success', 'estimating', projectId);
+      repo.insertLog(ticket.id, `Complexité estimée : ${estimation.complexity}`, 'success', 'estimating');
+      repo.insertActivity(ticket.id, `Complexité estimée : ${estimation.complexity}`, 'estimate');
 
-    // Guard: if AI generated 0 lines, fail early instead of reviewing nothing
-    if (codingResult.linesAdded === 0 && codingResult.linesRemoved === 0) {
-      repo.updateTicketStatus(ticket.id, 'rejected', 0);
-      repo.updateTicketFields(ticket.id, { pipeline_step: 0 });
-      emitTicketStatus(ticket.id, 'rejected', 0, projectId);
-      emitTicketLog(ticket.id, 'Aucun code généré — vérifiez la description ou les fichiers cibles', 'error', 'coding', projectId);
-      repo.insertLog(ticket.id, 'Aucun code généré — vérifiez la description ou les fichiers cibles', 'error', 'coding');
-      fileLocker.unlock(ticket.id);
-      emitNotification(`Ticket #${ticket.id} : aucun code généré`, 'error', projectId);
-      return;
-    }
+      // 4. AI Coding
+      repo.updateTicketStatus(ticket.id, 'ai_coding', 25);
+      emitTicketStatus(ticket.id, 'ai_coding', 25, projectId);
+      emitTicketLog(ticket.id, 'Génération du code par IA...', 'info', 'coding', projectId);
+      repo.insertLog(ticket.id, 'Génération du code par IA...', 'info', 'coding');
 
-    // 5. AI Review
-    repo.updateTicketStatus(ticket.id, 'ai_review', 60);
-    emitTicketStatus(ticket.id, 'ai_review', 60, projectId);
-    emitTicketLog(ticket.id, 'Review du code par IA...', 'info', 'reviewing', projectId);
-    repo.insertLog(ticket.id, 'Review du code par IA...', 'info', 'reviewing');
+      codingResult = await aiCoder.generateCode(ticket);
 
-    const reviewResult = await aiReviewer.review(ticket, codingResult);
+      repo.updateTicketFields(ticket.id, {
+        lines_added: codingResult.linesAdded,
+        lines_removed: codingResult.linesRemoved,
+        tokens_used: codingResult.tokensUsed,
+        cost_usd: codingResult.costUsd,
+        branch_name: codingResult.branchName,
+        progress: 50,
+        pipeline_step: 4,
+      });
 
-    repo.updateTicketFields(ticket.id, {
-      ai_review_score: reviewResult.score,
-      ai_review_data: JSON.stringify(reviewResult),
-      progress: 70,
-      pipeline_step: 5,
-    });
+      // Store diff
+      if (codingResult.diff) {
+        repo.insertLog(ticket.id, codingResult.diff, 'diff', 'coding');
+      }
 
-    const reviewLogType = reviewResult.score >= 50 ? 'success' : 'error';
-    emitTicketLog(ticket.id, `Review score: ${reviewResult.score}/100`, reviewLogType, 'reviewing', projectId);
-    repo.insertLog(ticket.id, `Review score: ${reviewResult.score}/100`, reviewLogType, 'reviewing');
-    repo.insertActivity(ticket.id, `AI Review: ${reviewResult.score}/100`, 'ai_review');
+      emitTicketLog(ticket.id, `Code généré : +${codingResult.linesAdded} -${codingResult.linesRemoved} lignes`, 'success', 'coding', projectId);
+      repo.insertLog(ticket.id, `Code généré : +${codingResult.linesAdded} -${codingResult.linesRemoved} lignes`, 'success', 'coding');
+      repo.insertActivity(ticket.id, `Code généré par ${ticket.ai_model}`, 'ai');
 
-    // Auto-reject if score below threshold
-    const threshold = parseInt(repo.getConfig('ai_review_threshold') || '50', 10);
-    if (reviewResult.score < threshold) {
-      repo.updateTicketStatus(ticket.id, 'rejected', 0);
-      emitTicketStatus(ticket.id, 'rejected', 0, projectId);
-      emitTicketLog(ticket.id, 'Auto-rejeté : score trop bas', 'error', 'reviewing', projectId);
-      fileLocker.unlock(ticket.id);
-      emitNotification(`Ticket #${ticket.id} auto-rejeté (score : ${reviewResult.score}/100)`, 'error', projectId);
-      return;
+      // Guard: if AI generated 0 lines, fail early instead of reviewing nothing
+      if (codingResult.linesAdded === 0 && codingResult.linesRemoved === 0) {
+        repo.updateTicketStatus(ticket.id, 'rejected', 0);
+        repo.updateTicketFields(ticket.id, { pipeline_step: 0 });
+        emitTicketStatus(ticket.id, 'rejected', 0, projectId);
+        emitTicketLog(ticket.id, 'Aucun code généré — vérifiez la description ou les fichiers cibles', 'error', 'coding', projectId);
+        repo.insertLog(ticket.id, 'Aucun code généré — vérifiez la description ou les fichiers cibles', 'error', 'coding');
+        fileLocker.unlock(ticket.id);
+        emitNotification(`Ticket #${ticket.id} : aucun code généré`, 'error', projectId);
+        return;
+      }
+
+      // 5. AI Review
+      repo.updateTicketStatus(ticket.id, 'ai_review', 60);
+      emitTicketStatus(ticket.id, 'ai_review', 60, projectId);
+      emitTicketLog(ticket.id, 'Review du code par IA...', 'info', 'reviewing', projectId);
+      repo.insertLog(ticket.id, 'Review du code par IA...', 'info', 'reviewing');
+
+      const reviewResult = await aiReviewer.review(ticket, codingResult);
+
+      repo.updateTicketFields(ticket.id, {
+        ai_review_score: reviewResult.score,
+        ai_review_data: JSON.stringify(reviewResult),
+        progress: 70,
+        pipeline_step: 5,
+      });
+
+      const reviewLogType = reviewResult.score >= 50 ? 'success' : 'error';
+      emitTicketLog(ticket.id, `Review score: ${reviewResult.score}/100`, reviewLogType, 'reviewing', projectId);
+      repo.insertLog(ticket.id, `Review score: ${reviewResult.score}/100`, reviewLogType, 'reviewing');
+      repo.insertActivity(ticket.id, `AI Review: ${reviewResult.score}/100`, 'ai_review');
+
+      // Auto-reject if score below threshold
+      const threshold = parseInt(repo.getConfig('ai_review_threshold') || '50', 10);
+      if (reviewResult.score < threshold) {
+        repo.updateTicketStatus(ticket.id, 'rejected', 0);
+        emitTicketStatus(ticket.id, 'rejected', 0, projectId);
+        emitTicketLog(ticket.id, 'Auto-rejeté : score trop bas', 'error', 'reviewing', projectId);
+        fileLocker.unlock(ticket.id);
+        emitNotification(`Ticket #${ticket.id} auto-rejeté (score : ${reviewResult.score}/100)`, 'error', projectId);
+        return;
+      }
     }
 
     // 6. Auto Tests
@@ -217,6 +260,11 @@ router.post('/launch/:id', checkPipelineLimit, pipelineGuard, async (req: Reques
 
       const deployResult = await deployer.deployToStaging(ticket, codingResult);
 
+      // Store coding files for later use (approve → production deploy)
+      if (codingResult.files && codingResult.files.length > 0) {
+        repo.insertLog(ticket.id, JSON.stringify(codingResult.files), 'coding_files', 'deploying');
+      }
+
       repo.updateTicketFields(ticket.id, {
         status: 'review',
         pr_url: deployResult.prUrl,
@@ -227,6 +275,7 @@ router.post('/launch/:id', checkPipelineLimit, pipelineGuard, async (req: Reques
       });
 
       emitTicketStatus(ticket.id, 'review', 100, projectId);
+      emitTicketUpdated(ticket.id, { staging_url: deployResult.stagingUrl, pr_url: deployResult.prUrl }, projectId);
       emitTicketLog(ticket.id, `PR créée : ${deployResult.prUrl}`, 'success', 'deploying', projectId);
       repo.insertLog(ticket.id, `PR créée : ${deployResult.prUrl}`, 'success', 'deploying');
       repo.insertActivity(ticket.id, `Déployé - PR : ${deployResult.prUrl}`, 'push');

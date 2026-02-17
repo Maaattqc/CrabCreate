@@ -1,4 +1,4 @@
-import { Play, Settings, Move, Star, Check, X } from 'lucide-react';
+import { Play, Settings, Move, Star, Eye, Archive } from 'lucide-react';
 import { getColumnColor } from '../../constants';
 import { useLanguage } from '../../hooks/useLanguage';
 import { useAIDesign } from '../../hooks/useAIDesign';
@@ -10,6 +10,8 @@ interface TicketCardProps {
   ticket: Ticket;
   onClick: (t: Ticket) => void;
   onLaunch: (id: number) => void;
+  onArchive?: (id: number) => void;
+  onReview?: (ticket: Ticket) => void;
   viewers?: TicketViewer[];
   draggingBy?: { userId: number; email: string } | null;
   labels?: Label[];
@@ -34,7 +36,7 @@ function Sparkline({ color, progress }: { color: string; progress: number }) {
   );
 }
 
-export default function TicketCard({ ticket, onClick, onLaunch, viewers = [], draggingBy, labels = [], isFavorite = false }: TicketCardProps) {
+export default function TicketCard({ ticket, onClick, onLaunch, onArchive, onReview, viewers = [], draggingBy, labels = [], isFavorite = false }: TicketCardProps) {
   const { t } = useLanguage();
   const { aiDesign } = useAIDesign();
   const statusColor = getColumnColor(ticket.status);
@@ -156,7 +158,7 @@ export default function TicketCard({ ticket, onClick, onLaunch, viewers = [], dr
           <div className="flex items-center gap-3 mb-2 text-[11px] font-mono text-tx-faint">
             {ticket.cost_usd > 0 && (
               <span className="flex items-center gap-1">
-                <span className="text-amber-400">$</span>{ticket.cost_usd.toFixed(2)}
+                {ticket.cost_usd.toFixed(2)}<span className="text-amber-400">$</span>
               </span>
             )}
             {ticket.lines_added > 0 && (
@@ -167,23 +169,29 @@ export default function TicketCard({ ticket, onClick, onLaunch, viewers = [], dr
           </div>
         )}
 
-        {/* Approve / Reject buttons for review status */}
+        {/* View changes button for review status */}
         {ticket.status === 'review' && (
-          <div className="flex flex-col gap-1.5 mb-2.5">
+          <div className="mb-2.5">
             <button
               data-onboard-approve-btn
-              onClick={(e: React.MouseEvent) => { e.stopPropagation(); }}
-              className="flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-green-600 text-white text-xs font-semibold shadow-lg shadow-green-600/20 transition-colors hover:bg-green-500"
+              onClick={(e: React.MouseEvent) => { e.stopPropagation(); onReview?.(ticket); }}
+              className="flex items-center justify-center gap-1.5 w-full py-1.5 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-xs font-semibold transition-colors hover:bg-cyan-500/20"
             >
-              <Check size={12} />
-              {t.approve}
+              <Eye size={12} />
+              {t.viewChanges}
             </button>
+          </div>
+        )}
+
+        {/* Archive button for approved tickets */}
+        {ticket.status === 'approved' && onArchive && (
+          <div className="mb-2.5">
             <button
-              onClick={(e: React.MouseEvent) => { e.stopPropagation(); }}
-              className="flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-semibold transition-colors hover:bg-red-500/20"
+              onClick={(e: React.MouseEvent) => { e.stopPropagation(); onArchive(ticket.id); }}
+              className="flex items-center justify-center gap-1.5 w-full py-1.5 rounded-lg bg-slate-500/10 border border-slate-500/20 text-slate-400 text-xs font-semibold transition-colors hover:bg-slate-500/20"
             >
-              <X size={12} />
-              {t.reject}
+              <Archive size={12} />
+              {t.archive}
             </button>
           </div>
         )}

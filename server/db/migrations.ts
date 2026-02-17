@@ -384,6 +384,9 @@ function migrate(): void {
   if (ticketCols.length > 0 && !ticketColNames.includes('due_date')) {
     db.exec("ALTER TABLE kanban_tickets ADD COLUMN due_date TEXT");
   }
+  if (ticketCols.length > 0 && !ticketColNames.includes('archived_at')) {
+    db.exec("ALTER TABLE kanban_tickets ADD COLUMN archived_at TEXT DEFAULT NULL");
+  }
 
   const projectCols = db.prepare("PRAGMA table_info(kanban_projects)").all() as { name: string }[];
   const projectColNames = projectCols.map(c => c.name);
@@ -543,6 +546,9 @@ function migrate(): void {
       console.log(`[DB] Migrated ${usersWithTickets.length} user(s) to default projects`);
     }
   }
+
+  // [TEST] Skip AI coding in pipeline — set to '0' or remove to re-enable
+  db.prepare("INSERT INTO kanban_config (config_key, config_value) VALUES ('skip_coding', '1') ON CONFLICT(config_key) DO NOTHING").run();
 
   console.log('[DB] Migrations completed');
 }

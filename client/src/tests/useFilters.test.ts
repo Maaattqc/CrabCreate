@@ -28,6 +28,7 @@ const makeTicket = (overrides: Partial<Ticket> = {}): Ticket => ({
   pipeline_step: 0,
   position: 0,
   due_date: null,
+  archived_at: null,
   branch_name: '',
   pr_url: '',
   pr_id: 0,

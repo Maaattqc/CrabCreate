@@ -17,6 +17,7 @@ export interface Ticket {
   depends_on: string | null;
   branch_name: string | null;
   due_date: string | null;
+  archived_at: string | null;
   pr_url: string | null;
   pr_id: number | null;
   staging_url: string | null;

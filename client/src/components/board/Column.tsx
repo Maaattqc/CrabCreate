@@ -11,6 +11,8 @@ interface ColumnProps {
   tickets: Ticket[];
   onTicketClick: (t: Ticket) => void;
   onLaunch: (id: number) => void;
+  onArchive?: (id: number) => void;
+  onReview?: (ticket: Ticket) => void;
   onCreateClick?: () => void;
   stepNumber: number;
   totalTickets?: number;
@@ -18,7 +20,7 @@ interface ColumnProps {
   isDragging?: (ticketId: number) => { userId: number; email: string } | null;
 }
 
-export default function Column({ column, tickets, onTicketClick, onLaunch, onCreateClick, stepNumber, totalTickets = 0, getViewers, isDragging }: ColumnProps) {
+export default function Column({ column, tickets, onTicketClick, onLaunch, onArchive, onReview, onCreateClick, stepNumber, totalTickets = 0, getViewers, isDragging }: ColumnProps) {
   const { t } = useLanguage();
 
   return (
@@ -82,6 +84,8 @@ export default function Column({ column, tickets, onTicketClick, onLaunch, onCre
               ticket={ticket}
               onClick={onTicketClick}
               onLaunch={onLaunch}
+              onArchive={onArchive}
+              onReview={onReview}
               viewers={getViewers?.(ticket.id)}
               draggingBy={isDragging?.(ticket.id)}
             />
