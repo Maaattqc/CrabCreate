@@ -741,6 +741,8 @@ export interface Translations {
   compareTitle: string;
   compareNoProductionUrl: string;
   compareNoPreviewUrl: string;
+  compareLoadingPreview: string;
+  archivedOn: string;
   viewChanges: string;
 }
 
@@ -1414,6 +1416,8 @@ export const translations: Record<Lang, Translations> = {
     compareTitle: 'Comparaison avant / après',
     compareNoProductionUrl: 'URL de production non configurée',
     compareNoPreviewUrl: 'URL de preview non disponible',
+    compareLoadingPreview: 'Chargement du preview...',
+    archivedOn: 'Archivé le',
     viewChanges: 'Voir changements',
   },
   en: {
@@ -2085,6 +2089,8 @@ export const translations: Record<Lang, Translations> = {
     compareTitle: 'Before / After Comparison',
     compareNoProductionUrl: 'Production URL not configured',
     compareNoPreviewUrl: 'Preview URL not available',
+    compareLoadingPreview: 'Loading preview...',
+    archivedOn: 'Archived on',
     viewChanges: 'View changes',
   },
 };

@@ -1,7 +1,9 @@
-import { X, Check, XCircle, ExternalLink } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { X, Check, XCircle, ExternalLink, Loader2 } from 'lucide-react';
 import { getColumnColor, getColumnLabel } from '../../constants';
 import { useLanguage } from '../../hooks/useLanguage';
 import { useProject } from '../../hooks/useProject';
+import { getTicket } from '../../api/tickets';
 import type { Ticket } from '../../types';
 
 interface ReviewCompareModalProps {
@@ -17,7 +19,31 @@ export default function ReviewCompareModal({ ticket, onClose, onApprove, onRejec
   const statusColor = getColumnColor(ticket.status);
   const statusLabel = getColumnLabel(ticket.status, t as unknown as Record<string, string>);
   const productionUrl = currentProject?.cf_site_url || null;
-  const previewUrl = ticket.staging_url || null;
+
+  // Fetch fresh ticket data to ensure staging_url is up-to-date
+  const [freshStagingUrl, setFreshStagingUrl] = useState<string | null>(ticket.staging_url || null);
+  const [loadingPreview, setLoadingPreview] = useState(!ticket.staging_url);
+
+  useEffect(() => {
+    if (ticket.staging_url) {
+      setFreshStagingUrl(ticket.staging_url);
+      setLoadingPreview(false);
+      return;
+    }
+    // Ticket doesn't have staging_url yet — fetch fresh from API
+    let cancelled = false;
+    getTicket(ticket.id)
+      .then(fresh => {
+        if (!cancelled && fresh.staging_url) {
+          setFreshStagingUrl(fresh.staging_url);
+        }
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLoadingPreview(false); });
+    return () => { cancelled = true; };
+  }, [ticket.id, ticket.staging_url]);
+
+  const previewUrl = freshStagingUrl || null;
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-black/70 backdrop-blur-sm" onClick={onClose}>
@@ -73,7 +99,12 @@ export default function ReviewCompareModal({ ticket, onClose, onApprove, onRejec
                 </a>
               )}
             </div>
-            {previewUrl ? (
+            {loadingPreview ? (
+              <div className="flex-1 rounded-lg border border-th-border flex items-center justify-center bg-subtle">
+                <Loader2 size={18} className="animate-spin text-tx-faint mr-2" />
+                <span className="text-sm text-tx-faint">{t.compareLoadingPreview}</span>
+              </div>
+            ) : previewUrl ? (
               <div className="flex-1 rounded-lg border border-th-border overflow-hidden bg-white">
                 <iframe src={previewUrl} className="w-full h-full" sandbox="allow-scripts allow-same-origin" title={t.compareAfter} />
               </div>

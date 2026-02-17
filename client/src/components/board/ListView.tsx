@@ -140,9 +140,15 @@ export default function ListView({ tickets, onTicketClick, onArchive, onUnarchiv
                     <td className="py-2.5 px-3 text-xs font-mono text-tx-faint">#{ticket.id}</td>
                     <td className="py-2.5 px-3 text-sm text-tx-secondary max-w-xs truncate">{ticket.title}</td>
                     <td className="py-2.5 px-3">
-                      <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: statusColor + '20', color: statusColor }}>
-                        {statusLabel}
-                      </span>
+                      {isArchiveView && ticket.archived_at ? (
+                        <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-slate-500/15 text-slate-400">
+                          {t.archivedOn} {new Date(ticket.archived_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                        </span>
+                      ) : (
+                        <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: statusColor + '20', color: statusColor }}>
+                          {statusLabel}
+                        </span>
+                      )}
                     </td>
                     <td className="py-2.5 px-3 text-xs font-mono text-tx-muted">{ticket.ai_model}</td>
                     <td className="py-2.5 px-3">
