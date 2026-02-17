@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import config from '../config';
 import * as repo from '../db/repositories';
 import { createRateLimitStore } from '../middleware/rate-limit-store';
@@ -146,7 +146,7 @@ function ensureDevLoginAccess(req: Request, res: Response): boolean {
 }
 
 function clientRateKey(req: Request): string {
-  const ip = req.ip || req.socket.remoteAddress || 'unknown';
+  const ip = ipKeyGenerator(req);
   const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : 'unknown';
   return `${ip}:${email}`;
 }
