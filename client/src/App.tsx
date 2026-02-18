@@ -422,6 +422,7 @@ function Dashboard() {
           onRetry={async (id: number) => { await retry(id); setSelectedTicket(null); }}
           onRollback={async (id: number) => { await rollback(id); setSelectedTicket(null); }}
           onDelete={async (id: number) => { await remove(id); setSelectedTicket(null); }}
+          onReview={(t: Ticket) => { setSelectedTicket(null); setReviewTicket(t); }}
         />
       )}
 

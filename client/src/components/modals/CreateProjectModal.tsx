@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { X, Lock, Users, Link, FolderPlus, Github, GitBranch, Loader2, ArrowLeft } from 'lucide-react';
+import { X, Lock, Users, Link, FolderPlus, Github, GitBranch, Loader2, ArrowLeft, Check, XCircle, Wifi } from 'lucide-react';
 import { useLanguage } from '../../hooks/useLanguage';
 import { useProject } from '../../hooks/useProject';
-import { connectRepo } from '../../api/project-setup';
+import { connectRepo, testConnection } from '../../api/project-setup';
 import type { GitProviderType } from '../../types';
 
 interface CreateProjectModalProps {
@@ -35,7 +35,26 @@ export default function CreateProjectModal({ onClose }: CreateProjectModalProps)
   const [token, setToken] = useState('');
   const [owner, setOwner] = useState('');
   const [repoName, setRepoName] = useState('');
-  const [branch, setBranch] = useState('main');
+  const [branch, setBranch] = useState('master');
+  const [targetBranch, setTargetBranch] = useState('develop');
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<'success' | 'fail' | null>(null);
+
+  const handleTestConnection = async () => {
+    setTesting(true);
+    setTestResult(null);
+    setError('');
+    try {
+      const res = await testConnection({ provider, token, owner, repo: repoName });
+      setTestResult(res.success ? 'success' : 'fail');
+      if (!res.success && res.error) setError(res.error);
+    } catch (err) {
+      setTestResult('fail');
+      setError((err as Error).message);
+    } finally {
+      setTesting(false);
+    }
+  };
 
   const autoSlug = (value: string) => {
     setName(value);
@@ -64,7 +83,7 @@ export default function CreateProjectModal({ onClose }: CreateProjectModalProps)
       // If connect mode, also connect the repo to the newly created project
       if (mode === 'connect') {
         try {
-          await connectRepo({ provider, owner, repo: repoName, token, branch });
+          await connectRepo({ provider, owner, repo: repoName, token, branch, target_branch: targetBranch });
         } catch (err) {
           // Project created but repo connection failed — still close, user can retry in settings
           console.warn('Repo connection failed after project creation:', (err as Error).message);
@@ -193,15 +212,43 @@ export default function CreateProjectModal({ onClose }: CreateProjectModalProps)
                   </div>
                 </div>
 
-                <div>
-                  <label className="text-sm font-medium text-tx-secondary block mb-1">{t.setupBranch}</label>
-                  <input
-                    type="text"
-                    value={branch}
-                    onChange={e => setBranch(e.target.value)}
-                    className="w-full bg-subtle border border-th-border rounded-lg px-3 py-2 text-sm text-tx-primary placeholder-tx-faint focus:outline-none focus:border-amber-500/50"
-                  />
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-sm font-medium text-tx-secondary block mb-1">{t.setupSourceBranch}</label>
+                    <input
+                      type="text"
+                      value={branch}
+                      onChange={e => setBranch(e.target.value)}
+                      className="w-full bg-subtle border border-th-border rounded-lg px-3 py-2 text-sm text-tx-primary placeholder-tx-faint focus:outline-none focus:border-amber-500/50"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-tx-secondary block mb-1">{t.setupTargetBranch}</label>
+                    <input
+                      type="text"
+                      value={targetBranch}
+                      onChange={e => setTargetBranch(e.target.value)}
+                      className="w-full bg-subtle border border-th-border rounded-lg px-3 py-2 text-sm text-tx-primary placeholder-tx-faint focus:outline-none focus:border-amber-500/50"
+                    />
+                  </div>
                 </div>
+
+                <button
+                  type="button"
+                  onClick={handleTestConnection}
+                  disabled={testing || !token || !provider}
+                  className="w-full py-2 rounded-lg border border-th-border text-sm text-tx-secondary hover:bg-subtle-hover transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {testing ? (
+                    <><Loader2 size={14} className="animate-spin" /> {t.setupTesting}</>
+                  ) : testResult === 'success' ? (
+                    <><Check size={14} className="text-green-400" /> <span className="text-green-400">{t.setupTestConnectionSuccess}</span></>
+                  ) : testResult === 'fail' ? (
+                    <><XCircle size={14} className="text-red-400" /> <span className="text-red-400">{t.setupTestConnectionFail}</span></>
+                  ) : (
+                    <><Wifi size={14} /> {t.setupTestConnection}</>
+                  )}
+                </button>
 
                 <div className="border-t border-th-border" />
               </>

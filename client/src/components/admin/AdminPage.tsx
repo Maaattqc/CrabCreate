@@ -89,6 +89,7 @@ interface AdminSettings {
   contact_window_minutes: number;
   // Git & Deploy
   git_default_branch: string;
+  git_target_branch: string;
   git_merge_strategy: string;
   git_pr_close_source_branch: number;
   branch_name_max_length: number;
@@ -155,7 +156,7 @@ export default function AdminPage() {
     ai_tokens_complexity: 500, ai_tokens_chat: 4096, ai_tokens_review: 2048,
     auth_code_expiry_minutes: 10, auth_code_limit: 5, auth_code_window_minutes: 15,
     auth_verify_limit: 5, auth_verify_window_minutes: 15, contact_limit: 3, contact_window_minutes: 60,
-    git_default_branch: 'master', git_merge_strategy: 'merge_commit', git_pr_close_source_branch: 1,
+    git_default_branch: 'master', git_target_branch: 'develop', git_merge_strategy: 'merge_commit', git_pr_close_source_branch: 1,
     branch_name_max_length: 50, auto_repo_enabled: 0, auto_repo_default_private: 1,
     queue_polling_interval_ms: 5000, test_multiplier_per_file: 3,
     audit_log_default_limit: 50, audit_log_max_limit: 500, notification_timeout_ms: 5000,
@@ -836,6 +837,7 @@ function SettingsTab({
       bgTint: 'bg-green-500/10',
       fields: [
         { type: 'text', key: 'git_default_branch', label: t.settingsGitDefaultBranch, desc: t.settingsGitDefaultBranchDesc },
+        { type: 'text', key: 'git_target_branch', label: t.settingsGitTargetBranch, desc: t.settingsGitTargetBranchDesc },
         { type: 'select', key: 'git_merge_strategy', label: t.settingsGitMergeStrategy, desc: t.settingsGitMergeStrategyDesc, options: [{ value: 'merge_commit', label: 'Merge commit' }, { value: 'squash', label: 'Squash' }, { value: 'fast_forward', label: 'Fast-forward' }] },
         { type: 'toggle', key: 'git_pr_close_source_branch', label: t.settingsGitCloseBranch, desc: t.settingsGitCloseBranchDesc },
         { type: 'number', key: 'branch_name_max_length', label: t.settingsBranchMaxLength, desc: t.settingsBranchMaxLengthDesc, min: 15, max: 100 },

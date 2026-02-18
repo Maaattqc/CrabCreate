@@ -230,6 +230,11 @@ async function createDeployment(
 /**
  * Deploy to Cloudflare Pages via Direct Upload API.
  * 5-step process: upload-token → check-missing → upload → upsert → deploy.
+ *
+ * @param baseManifest  Optional manifest from a previous production deploy.
+ *                      New local files override entries with the same path.
+ *                      CF already has the base assets cached by hash, so they
+ *                      won't need re-uploading — only truly new files are sent.
  */
 export async function deploy(
   accountId: string,
@@ -237,36 +242,37 @@ export async function deploy(
   distDir: string,
   token: string,
   branch = 'main',
-): Promise<{ url: string }> {
+  baseManifest: Record<string, string> = {},
+): Promise<{ url: string; manifest: Record<string, string> }> {
   if (!/^[a-zA-Z0-9_-]+$/.test(projectName)) {
     throw new Error('Invalid project name');
   }
   const resolvedDist = path.resolve(distDir);
 
-  // Collect all files with BLAKE3 hashes
+  // Collect all LOCAL files with BLAKE3 hashes
   const files = collectFiles(resolvedDist);
-  if (files.length === 0) {
+  if (files.length === 0 && Object.keys(baseManifest).length === 0) {
     throw new Error('No files to deploy');
   }
 
-  // Build manifest: { "/path/to/file": "blake3hash32", ... }
-  const manifest: Record<string, string> = {};
+  // Build manifest: start from production base, then overlay local (new/modified) files
+  const manifest: Record<string, string> = { ...baseManifest };
   for (const file of files) {
     manifest[file.filePath] = file.hash;
   }
 
   logger.info(`[CF] === Starting deploy to ${projectName} (branch: ${branch}) ===`);
-  logger.info(`[CF] Files: ${files.map(f => `${f.filePath} (${f.hash}, ${f.content.length}B, ${f.contentType})`).join(', ')}`);
+  logger.info(`[CF] Local files: ${files.length}, base manifest entries: ${Object.keys(baseManifest).length}, total manifest: ${Object.keys(manifest).length}`);
 
   try {
     // Step 1: Get upload JWT (GET request)
     const jwt = await getUploadToken(accountId, projectName, token);
 
-    // Step 2: Check which files are missing
-    const allHashes = files.map(f => f.hash);
+    // Step 2: Check which files are missing (includes base + new hashes)
+    const allHashes = [...new Set(Object.values(manifest))];
     const missingHashes = await checkMissing(allHashes, jwt);
 
-    // Step 3: Upload missing files (base64 JSON)
+    // Step 3: Upload missing files — only local files we have content for
     const missingSet = new Set(missingHashes);
     const filesToUpload = files.filter(f => missingSet.has(f.hash));
     await uploadAssets(filesToUpload, jwt);
@@ -274,11 +280,11 @@ export async function deploy(
     // Step 4: Upsert all hashes
     await upsertHashes(allHashes, jwt);
 
-    // Step 5: Create deployment with manifest
+    // Step 5: Create deployment with full manifest (base + new)
     const deployment = await createDeployment(accountId, projectName, manifest, branch, token);
 
-    logger.info(`[CF] === Deploy complete: ${deployment.url} ===`);
-    return { url: deployment.url };
+    logger.info(`[CF] === Deploy complete: ${deployment.url} (${Object.keys(manifest).length} files) ===`);
+    return { url: deployment.url, manifest };
   } catch (err) {
     if (axios.isAxiosError(err) && err.response) {
       const errDetail = JSON.stringify(err.response.data, null, 2);

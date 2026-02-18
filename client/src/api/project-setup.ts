@@ -17,6 +17,13 @@ export async function getSetupStatus(): Promise<ProjectSetupStatus> {
   return request<ProjectSetupStatus>(`${API}/project-setup/status`);
 }
 
+export async function testConnection(data: { provider: string; token: string; owner?: string; repo?: string }): Promise<{ success: boolean; error?: string }> {
+  return request(`${API}/project-setup/test-connection`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
 export async function connectRepo(data: ConnectRepoPayload): Promise<{ success: boolean; repoId: string }> {
   return request(`${API}/project-setup/connect-repo`, {
     method: 'POST',

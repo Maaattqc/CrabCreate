@@ -104,7 +104,7 @@ export function findAllTickets(filters: Record<string, string>, userId?: number,
     params.push(`%${escapeLike(filters.search)}%`, `%${escapeLike(filters.search)}%`);
   }
 
-  sql += ' ORDER BY t.position ASC, t.created_at DESC LIMIT ? OFFSET ?';
+  sql += " ORDER BY CASE WHEN t.status = 'backlog' THEN t.position ELSE 2147483647 END ASC, t.updated_at ASC LIMIT ? OFFSET ?";
   const safeLimit = Math.min(Math.max(1, limit), 500);
   params.push(safeLimit, Math.max(0, offset));
   return db.prepare(sql).all(...params) as Ticket[];
@@ -310,7 +310,7 @@ export function computeColumnTimes(ticketId: number): { status: string; duration
 // ── Logs ─────────────────────────────────────────────────────────────────────
 
 export function findLogsByTicketId(ticketId: number): LogEntry[] {
-  return db.prepare('SELECT * FROM kanban_logs WHERE ticket_id = ? ORDER BY created_at ASC').all(ticketId) as LogEntry[];
+  return db.prepare("SELECT * FROM kanban_logs WHERE ticket_id = ? AND log_type NOT IN ('coding_files', 'coding_files_base', 'diff') ORDER BY created_at ASC").all(ticketId) as LogEntry[];
 }
 
 export function insertLog(ticketId: number, message: string, logType: string, phase: string): void {
@@ -322,18 +322,6 @@ export function findLatestDiff(ticketId: number): string | null {
     "SELECT message FROM kanban_logs WHERE ticket_id = ? AND phase = 'coding' AND log_type = 'diff' ORDER BY created_at DESC LIMIT 1"
   ).get(ticketId) as { message: string } | undefined;
   return row ? row.message : null;
-}
-
-export function findCodingFiles(ticketId: number): { path: string; content: string }[] {
-  const row = db.prepare(
-    "SELECT message FROM kanban_logs WHERE ticket_id = ? AND log_type = 'coding_files' ORDER BY created_at DESC LIMIT 1"
-  ).get(ticketId) as { message: string } | undefined;
-  if (!row) return [];
-  try {
-    return JSON.parse(row.message);
-  } catch {
-    return [];
-  }
 }
 
 // ── Chat ─────────────────────────────────────────────────────────────────────
@@ -1506,6 +1494,7 @@ export function updateDeployConfig(projectId: number, data: Partial<DeployConfig
   if (data.cf_account_id !== undefined) { updates.push('cf_account_id = ?'); values.push(data.cf_account_id); }
   if (data.supabase_tenant_id !== undefined) { updates.push('supabase_tenant_id = ?'); values.push(data.supabase_tenant_id); }
   if (data.custom_domain !== undefined) { updates.push('custom_domain = ?'); values.push(data.custom_domain); }
+  if (data.production_manifest !== undefined) { updates.push('production_manifest = ?'); values.push(data.production_manifest); }
 
   if (updates.length === 0) return;
   values.push(projectId);
@@ -1563,6 +1552,7 @@ export function createOrUpdateRepo(id: string, data: Partial<Repo>): Repo {
     if (data.bitbucket_workspace !== undefined) { updates.push('bitbucket_workspace = ?'); values.push(data.bitbucket_workspace); }
     if (data.bitbucket_repo_slug !== undefined) { updates.push('bitbucket_repo_slug = ?'); values.push(data.bitbucket_repo_slug); }
     if (data.default_branch !== undefined) { updates.push('default_branch = ?'); values.push(data.default_branch); }
+    if (data.target_branch !== undefined) { updates.push('target_branch = ?'); values.push(data.target_branch); }
     if (data.local_path !== undefined) { updates.push('local_path = ?'); values.push(data.local_path); }
     if (data.git_provider !== undefined) { updates.push('git_provider = ?'); values.push(data.git_provider); }
     if (data.provider_owner !== undefined) { updates.push('provider_owner = ?'); values.push(data.provider_owner); }
@@ -1576,13 +1566,14 @@ export function createOrUpdateRepo(id: string, data: Partial<Repo>): Repo {
     return findRepoById(id)!;
   }
   db.prepare(
-    'INSERT INTO kanban_repos (id, label, bitbucket_workspace, bitbucket_repo_slug, default_branch, git_provider, provider_owner, provider_repo, provider_token, clone_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    'INSERT INTO kanban_repos (id, label, bitbucket_workspace, bitbucket_repo_slug, default_branch, target_branch, git_provider, provider_owner, provider_repo, provider_token, clone_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
   ).run(
     id,
     data.label || id,
     data.bitbucket_workspace || '',
     data.bitbucket_repo_slug || '',
-    data.default_branch || 'main',
+    data.default_branch || 'master',
+    data.target_branch || 'develop',
     data.git_provider || 'bitbucket',
     data.provider_owner || '',
     data.provider_repo || '',

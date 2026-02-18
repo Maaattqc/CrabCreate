@@ -93,6 +93,7 @@ export const updateSettingsSchema = z.object({
   auto_repo_default_private: z.number().int().min(0).max(1).optional(),
   // Git & Deploy
   git_default_branch: z.string().min(1).max(100).optional(),
+  git_target_branch: z.string().min(1).max(100).optional(),
   git_merge_strategy: z.enum(['merge_commit', 'squash', 'fast_forward']).optional(),
   git_pr_close_source_branch: z.number().int().min(0).max(1).optional(),
   branch_name_max_length: z.number().int().min(15).max(100).optional(),
@@ -282,7 +283,8 @@ export const connectRepoSchema = z.object({
   owner: z.string().min(1, 'Owner requis').max(100),
   repo: z.string().min(1, 'Repo requis').max(100),
   token: z.string().min(1, 'Token requis').max(500),
-  branch: z.string().min(1).max(100).optional().default('main'),
+  branch: z.string().min(1).max(100).optional().default('master'),
+  target_branch: z.string().min(1).max(100).optional().default('develop'),
 });
 
 export const createRepoSchema = z.object({
@@ -290,6 +292,7 @@ export const createRepoSchema = z.object({
   token: z.string().min(1, 'Token requis').max(500),
   repoName: z.string().min(1, 'Nom du repo requis').max(100),
   isPrivate: z.boolean().optional().default(true),
+  target_branch: z.string().min(1).max(100).optional().default('develop'),
 });
 
 export const configureDeploySchema = z.object({

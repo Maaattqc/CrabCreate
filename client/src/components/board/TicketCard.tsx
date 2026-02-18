@@ -1,4 +1,4 @@
-import { Play, Settings, Move, Star, Eye, Archive } from 'lucide-react';
+import { Play, Settings, Move, Star, Archive } from 'lucide-react';
 import { getColumnColor } from '../../constants';
 import { useLanguage } from '../../hooks/useLanguage';
 import { useAIDesign } from '../../hooks/useAIDesign';
@@ -175,9 +175,8 @@ export default function TicketCard({ ticket, onClick, onLaunch, onArchive, onRev
             <button
               data-onboard-approve-btn
               onClick={(e: React.MouseEvent) => { e.stopPropagation(); onReview?.(ticket); }}
-              className="flex items-center justify-center gap-1.5 w-full py-1.5 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-xs font-semibold transition-colors hover:bg-cyan-500/20"
+              className="flex items-center justify-center gap-1.5 w-full py-2 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white text-xs font-semibold transition-all hover:from-violet-500 hover:to-indigo-500 shadow-md shadow-violet-500/20 hover:shadow-violet-500/30"
             >
-              <Eye size={12} />
               {t.viewChanges}
             </button>
           </div>

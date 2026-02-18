@@ -129,8 +129,10 @@ ${JSON.stringify({ title: ticket.title, description: ticket.description })}
   "files": [
     { "path": "relative/path.php", "content": "full file content" }
   ],
-  "summary": "brief description of changes"
-}`;
+  "summary": "brief description of changes",
+  "previewPath": "/page-to-preview.html or #section-id"
+}
+The previewPath should be the URL path or anchor to the page/section that best shows the changes (e.g. "/about.html", "/contact.html", "#about", "#pricing"). Use "/" if changes are on the homepage.`;
 
   let response: string;
   let tokensUsed = 0;
@@ -167,7 +169,7 @@ ${JSON.stringify({ title: ticket.title, description: ticket.description })}
   }
 
   // Parse response
-  let result: { files?: { path: string; content: string }[]; summary?: string };
+  let result: { files?: { path: string; content: string }[]; summary?: string; previewPath?: string };
   try {
     const jsonMatch = response.match(/\{[\s\S]*\}/);
     result = JSON.parse(jsonMatch?.[0] || '{}');
@@ -217,8 +219,20 @@ ${JSON.stringify({ title: ticket.title, description: ticket.description })}
   const costPerToken = ticket.ai_model === 'gpt' ? costPerTokenGpt : costPerTokenClaude;
   const costUsd = Math.round(tokensUsed * costPerToken * 10000) / 10000;
 
+  // Determine preview path: AI-provided, or fallback to first non-index HTML file
+  let previewPath = result.previewPath || '';
+  if (!previewPath) {
+    const modifiedPage = result.files.find(
+      f => f.path.endsWith('.html') && f.path !== 'index.html' && !f.path.startsWith('index.'),
+    );
+    if (modifiedPage) {
+      previewPath = modifiedPage.path.startsWith('/') ? modifiedPage.path : `/${modifiedPage.path}`;
+    }
+  }
+
   return {
     files: result.files,
+    baseFiles: existingFiles.map(f => ({ path: f.path, content: f.content })),
     summary: result.summary || '',
     diff: diffStr,
     linesAdded,
@@ -227,6 +241,7 @@ ${JSON.stringify({ title: ticket.title, description: ticket.description })}
     costUsd,
     branchName,
     repoDir,
+    previewPath,
   };
 }
 

@@ -79,6 +79,7 @@ const STRING_KEYS = [
   'ai_model_claude_version',
   'ai_model_gpt_version',
   'git_default_branch',
+  'git_target_branch',
   'git_merge_strategy',
 ] as const;
 
@@ -132,6 +133,7 @@ const DEFAULTS: Record<string, number | string> = {
   max_user_webhooks_per_project: 20,
   // Git & Deploy
   git_default_branch: 'master',
+  git_target_branch: 'develop',
   git_merge_strategy: 'merge_commit',
   git_pr_close_source_branch: 1,
   branch_name_max_length: 30,

@@ -84,6 +84,7 @@ function migrate(): void {
       bitbucket_workspace TEXT,
       bitbucket_repo_slug TEXT,
       default_branch TEXT DEFAULT 'master',
+      target_branch TEXT DEFAULT 'develop',
       local_path TEXT,
       created_at TEXT DEFAULT (datetime('now'))
     );
@@ -421,6 +422,9 @@ function migrate(): void {
   if (repoCols.length > 0 && !repoColNames.includes('clone_url')) {
     db.exec("ALTER TABLE kanban_repos ADD COLUMN clone_url TEXT DEFAULT ''");
   }
+  if (repoCols.length > 0 && !repoColNames.includes('target_branch')) {
+    db.exec("ALTER TABLE kanban_repos ADD COLUMN target_branch TEXT DEFAULT 'develop'");
+  }
 
   // Encrypt existing repo credentials at rest (idempotent)
   try {
@@ -448,9 +452,15 @@ function migrate(): void {
       cf_account_id TEXT,
       supabase_tenant_id TEXT,
       custom_domain TEXT,
+      production_manifest TEXT,
       created_at TEXT DEFAULT (datetime('now'))
     );
   `);
+
+  // Add production_manifest column if missing (existing DBs)
+  try {
+    db.exec("ALTER TABLE kanban_deploy_configs ADD COLUMN production_manifest TEXT");
+  } catch { /* column already exists */ }
 
   // Encrypt existing deploy credentials at rest (idempotent)
   try {

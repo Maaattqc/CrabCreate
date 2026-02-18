@@ -37,7 +37,7 @@ export function useTickets() {
 
   const create = async (data: Partial<Ticket>): Promise<Ticket> => {
     const ticket = await api.createTicket(data);
-    setTickets(prev => [ticket, ...prev]);
+    setTickets(prev => [...prev, ticket]);
     return ticket;
   };
 

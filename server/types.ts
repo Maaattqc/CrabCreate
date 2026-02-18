@@ -55,6 +55,7 @@ export interface Repo {
   bitbucket_workspace: string;
   bitbucket_repo_slug: string;
   default_branch: string;
+  target_branch: string;
   local_path: string;
   git_provider: 'github' | 'gitlab' | 'bitbucket';
   provider_owner: string;
@@ -163,6 +164,7 @@ export interface CodeFile {
 
 export interface CodingResult {
   files: CodeFile[];
+  baseFiles: CodeFile[];
   summary: string;
   diff: string;
   linesAdded: number;
@@ -171,6 +173,7 @@ export interface CodingResult {
   costUsd: number;
   branchName: string;
   repoDir: string;
+  previewPath: string;
 }
 
 export interface ReviewIssue {
@@ -455,6 +458,7 @@ export interface DeployConfig {
   cf_account_id: string | null;
   supabase_tenant_id: string | null;
   custom_domain: string | null;
+  production_manifest: string | null;
   created_at: string;
 }
 

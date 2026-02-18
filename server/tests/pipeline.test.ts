@@ -100,6 +100,7 @@ const MIGRATION_SQL = `
     bitbucket_workspace TEXT,
     bitbucket_repo_slug TEXT,
     default_branch TEXT DEFAULT 'master',
+    target_branch TEXT DEFAULT 'develop',
     local_path TEXT,
     git_provider TEXT DEFAULT 'bitbucket',
     provider_owner TEXT DEFAULT '',
@@ -221,6 +222,7 @@ import type { CodingResult, ReviewResult, TestResults, DeployResult } from '../t
 
 const MOCK_CODING_RESULT: CodingResult = {
   files: [{ path: 'index.php', content: '<?php echo "ok"; ?>' }],
+  baseFiles: [{ path: 'index.php', content: '<?php echo "hello"; ?>' }],
   summary: 'Test change',
   diff: '+line added\n-line removed',
   linesAdded: 10,
@@ -229,6 +231,7 @@ const MOCK_CODING_RESULT: CodingResult = {
   costUsd: 0.01,
   branchName: 'kanban/ticket-1-test',
   repoDir: '/tmp/repo',
+  previewPath: '',
 };
 
 const MOCK_REVIEW_RESULT: ReviewResult = {

@@ -433,6 +433,8 @@ export interface Translations {
   settingsCatGit: string;
   settingsGitDefaultBranch: string;
   settingsGitDefaultBranchDesc: string;
+  settingsGitTargetBranch: string;
+  settingsGitTargetBranchDesc: string;
   settingsGitMergeStrategy: string;
   settingsGitMergeStrategyDesc: string;
   settingsGitCloseBranch: string;
@@ -722,6 +724,12 @@ export interface Translations {
   setupOwner: string;
   setupRepoName: string;
   setupBranch: string;
+  setupSourceBranch: string;
+  setupTargetBranch: string;
+  setupTestConnection: string;
+  setupTestConnectionSuccess: string;
+  setupTestConnectionFail: string;
+  setupTesting: string;
   setupBack: string;
   setupConnect: string;
   setupCreateRepo: string;
@@ -1118,8 +1126,10 @@ export const translations: Record<Lang, Translations> = {
     settingsContactWindowDesc: 'Durée de la fenêtre de rate limit pour le formulaire',
 
     settingsCatGit: 'Git & Déploiement',
-    settingsGitDefaultBranch: 'Branche par défaut',
-    settingsGitDefaultBranchDesc: 'Branche cible pour les PR (master, main...)',
+    settingsGitDefaultBranch: 'Branche source',
+    settingsGitDefaultBranchDesc: 'Branche source pour le clone/pull (master, main...)',
+    settingsGitTargetBranch: 'Branche cible PR',
+    settingsGitTargetBranchDesc: 'Branche cible pour les Pull Requests (develop, main...)',
     settingsGitMergeStrategy: 'Stratégie de merge',
     settingsGitMergeStrategyDesc: 'Méthode de fusion des Pull Requests',
     settingsGitCloseBranch: 'Fermer branche source',
@@ -1397,6 +1407,12 @@ export const translations: Record<Lang, Translations> = {
     setupOwner: 'Owner / Organisation',
     setupRepoName: 'Nom du repo',
     setupBranch: 'Branche par défaut',
+    setupSourceBranch: 'Branche source (pull)',
+    setupTargetBranch: 'Branche cible (PR)',
+    setupTestConnection: 'Tester la connexion',
+    setupTestConnectionSuccess: 'Connexion réussie !',
+    setupTestConnectionFail: 'Connexion échouée',
+    setupTesting: 'Test en cours...',
     setupBack: 'Retour',
     setupConnect: 'Connecter',
     setupCreateRepo: 'Créer le repo',
@@ -1791,8 +1807,10 @@ export const translations: Record<Lang, Translations> = {
     settingsContactWindowDesc: 'Rate limit window for contact form',
 
     settingsCatGit: 'Git & Deploy',
-    settingsGitDefaultBranch: 'Default branch',
-    settingsGitDefaultBranchDesc: 'Target branch for PRs (master, main...)',
+    settingsGitDefaultBranch: 'Source branch',
+    settingsGitDefaultBranchDesc: 'Source branch for clone/pull (master, main...)',
+    settingsGitTargetBranch: 'Target branch (PR)',
+    settingsGitTargetBranchDesc: 'Target branch for Pull Requests (develop, main...)',
     settingsGitMergeStrategy: 'Merge strategy',
     settingsGitMergeStrategyDesc: 'Pull Request merge method',
     settingsGitCloseBranch: 'Close source branch',
@@ -2070,6 +2088,12 @@ export const translations: Record<Lang, Translations> = {
     setupOwner: 'Owner / Organization',
     setupRepoName: 'Repository name',
     setupBranch: 'Default branch',
+    setupSourceBranch: 'Source branch (pull)',
+    setupTargetBranch: 'Target branch (PR)',
+    setupTestConnection: 'Test connection',
+    setupTestConnectionSuccess: 'Connection successful!',
+    setupTestConnectionFail: 'Connection failed',
+    setupTesting: 'Testing...',
     setupBack: 'Back',
     setupConnect: 'Connect',
     setupCreateRepo: 'Create repo',

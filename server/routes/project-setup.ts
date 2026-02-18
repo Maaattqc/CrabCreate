@@ -36,11 +36,33 @@ router.get('/status', (req: Request, res: Response) => {
   res.json(status);
 });
 
+// POST /api/projects/:id/setup/test-connection
+router.post('/test-connection', async (req: Request, res: Response) => {
+  if (!requireProjectMemberAdmin(req, res)) return;
+
+  const { provider, token, owner, repo: repoName } = req.body;
+  if (!provider || !token) {
+    return res.status(400).json({ error: 'Provider and token are required' });
+  }
+
+  try {
+    const gitProvider = createGitProvider(provider, token, owner || '', repoName || '');
+    const valid = await gitProvider.validateToken();
+    if (!valid) {
+      return res.json({ success: false, error: 'Token invalide ou expiré' });
+    }
+    res.json({ success: true });
+  } catch (err) {
+    logger.error('[ProjectSetup] test-connection error:', err);
+    res.json({ success: false, error: (err as Error).message || 'Connection failed' });
+  }
+});
+
 // POST /api/projects/:id/setup/connect-repo
 router.post('/connect-repo', validate(connectRepoSchema), async (req: Request, res: Response) => {
   if (!requireProjectMemberAdmin(req, res)) return;
 
-  const { provider, owner, repo: repoName, token, branch } = req.body;
+  const { provider, owner, repo: repoName, token, branch, target_branch } = req.body;
   const projectId = req.project!.id;
 
   try {
@@ -63,7 +85,8 @@ router.post('/connect-repo', validate(connectRepoSchema), async (req: Request, r
       provider_repo: repoName,
       provider_token: token,
       clone_url: cloneUrl,
-      default_branch: branch || 'main',
+      default_branch: branch || 'master',
+      target_branch: target_branch || 'develop',
       // Also set bitbucket fields for backward compat
       bitbucket_workspace: provider === 'bitbucket' ? owner : '',
       bitbucket_repo_slug: provider === 'bitbucket' ? repoName : '',
@@ -88,7 +111,7 @@ router.post('/connect-repo', validate(connectRepoSchema), async (req: Request, r
 router.post('/create-repo', validate(createRepoSchema), async (req: Request, res: Response) => {
   if (!requireProjectMemberAdmin(req, res)) return;
 
-  const { provider, token, repoName, isPrivate } = req.body;
+  const { provider, token, repoName, isPrivate, target_branch } = req.body;
   const projectId = req.project!.id;
 
   try {
@@ -119,6 +142,7 @@ router.post('/create-repo', validate(createRepoSchema), async (req: Request, res
       provider_token: token,
       clone_url: cloneUrl,
       default_branch: 'main',
+      target_branch: target_branch || 'develop',
       bitbucket_workspace: provider === 'bitbucket' ? owner : '',
       bitbucket_repo_slug: provider === 'bitbucket' ? repoName : '',
     });

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { X, Check, XCircle, RotateCcw, Undo2, Trash2, Activity, ShieldCheck, MessageSquare, Terminal, Code2, FlaskConical, User, Calendar, Eye, EyeOff, Users, Lock, CheckSquare, Clock, ExternalLink, Columns2 } from 'lucide-react';
+import { X, RotateCcw, Undo2, Trash2, Activity, ShieldCheck, MessageSquare, Terminal, Code2, FlaskConical, User, Calendar, Eye, EyeOff, Users, Lock, CheckSquare, Clock, ExternalLink } from 'lucide-react';
 import { getColumnColor, getColumnLabel } from '../../constants';
 import { updateTicket, getTicketColumnTimes } from '../../api/tickets';
 import { fetchWatchers, toggleWatch } from '../../api/comments';
@@ -28,9 +28,10 @@ interface TicketDetailModalProps {
   onRetry: (id: number) => void;
   onRollback: (id: number) => void;
   onDelete: (id: number) => void;
+  onReview?: (ticket: Ticket) => void;
 }
 
-export default function TicketDetailModal({ ticket, initialTab, onClose, onApprove, onReject, onRetry, onRollback, onDelete }: TicketDetailModalProps) {
+export default function TicketDetailModal({ ticket, initialTab, onClose, onApprove, onReject, onRetry, onRollback, onDelete, onReview }: TicketDetailModalProps) {
   const { t } = useLanguage();
   const { user } = useAuth();
   const { on, off } = useSocket();
@@ -45,9 +46,7 @@ export default function TicketDetailModal({ ticket, initialTab, onClose, onAppro
   const [dueDate, setDueDate] = useState(ticket.due_date || '');
   const [showDueDateInput, setShowDueDateInput] = useState(false);
   const [columnTimes, setColumnTimes] = useState<ColumnTime[]>([]);
-  const [showCompare, setShowCompare] = useState(false);
   const productionUrl = currentProject?.cf_site_url || null;
-  const previewUrl = ticket.staging_url || null;
   const titleRef = useRef<HTMLInputElement>(null);
   const dueDateRef = useRef<HTMLInputElement>(null);
   const descRef = useRef<HTMLTextAreaElement>(null);
@@ -177,7 +176,7 @@ export default function TicketDetailModal({ ticket, initialTab, onClose, onAppro
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
       <div
-        className={`bg-surface border border-th-border-strong rounded-2xl w-full ${showCompare ? 'max-w-7xl' : 'max-w-4xl'} mx-4 max-h-[90vh] flex flex-col shadow-2xl shadow-black/40 transition-all duration-300`}
+        className="bg-surface border border-th-border-strong rounded-2xl w-full max-w-4xl mx-4 max-h-[90vh] flex flex-col shadow-2xl shadow-black/40 transition-all duration-300"
         onClick={(e: React.MouseEvent) => e.stopPropagation()}
       >
         {/* Header */}
@@ -470,82 +469,15 @@ export default function TicketDetailModal({ ticket, initialTab, onClose, onAppro
           {activeTab === 'subtasks' && <SubtasksTab ticketId={ticket.id} />}
         </div>
 
-        {/* Compare panel */}
-        {showCompare && (
-          <div className="px-8 py-4 border-t border-th-border">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-semibold text-tx-secondary">{t.compareTitle}</h3>
-              <button onClick={() => setShowCompare(false)} className="p-1 rounded-md text-tx-faint hover:text-tx-primary hover:bg-subtle-hover transition-colors">
-                <X size={14} />
-              </button>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Before (Production) */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-medium text-tx-faint uppercase tracking-wide">{t.compareBefore}</span>
-                  {productionUrl && (
-                    <a href={productionUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] text-cyan-400 hover:text-cyan-300 flex items-center gap-1">
-                      <ExternalLink size={10} />
-                    </a>
-                  )}
-                </div>
-                {productionUrl ? (
-                  <div className="h-[400px] rounded-lg border border-th-border overflow-hidden bg-white">
-                    <iframe src={productionUrl} className="w-full h-full" sandbox="allow-scripts allow-same-origin" title={t.compareBefore} />
-                  </div>
-                ) : (
-                  <div className="h-[400px] rounded-lg border border-th-border flex items-center justify-center bg-subtle">
-                    <span className="text-sm text-tx-faint">{t.compareNoProductionUrl}</span>
-                  </div>
-                )}
-              </div>
-              {/* After (Preview) */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-medium text-tx-faint uppercase tracking-wide">{t.compareAfter}</span>
-                  {previewUrl && (
-                    <a href={previewUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] text-cyan-400 hover:text-cyan-300 flex items-center gap-1">
-                      <ExternalLink size={10} />
-                    </a>
-                  )}
-                </div>
-                <div className="h-[400px] rounded-lg border border-th-border overflow-hidden bg-white">
-                  <iframe src={previewUrl!} className="w-full h-full" sandbox="allow-scripts allow-same-origin" title={t.compareAfter} />
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Actions */}
         <div className="px-8 py-4 border-t border-th-border flex items-center gap-3">
-          {ticket.status === 'review' && (
-            <>
-              {ticket.staging_url && ticket.staging_url !== '#simulation' && (
-                <a href={ticket.staging_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-4 py-2 bg-blue-500/15 text-blue-400 text-sm font-medium rounded-lg hover:bg-blue-500/25 border border-blue-500/20 transition-all">
-                  <ExternalLink size={14} /> Staging
-                </a>
-              )}
-              {previewUrl && previewUrl !== '#simulation' && (
-                <button
-                  onClick={() => setShowCompare(!showCompare)}
-                  className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg border transition-all ${
-                    showCompare
-                      ? 'bg-cyan-500/25 text-cyan-300 border-cyan-500/30'
-                      : 'bg-cyan-500/15 text-cyan-400 border-cyan-500/20 hover:bg-cyan-500/25'
-                  }`}
-                >
-                  <Columns2 size={14} /> {t.compareBtn}
-                </button>
-              )}
-              <button onClick={() => onApprove(ticket.id)} className="flex items-center gap-2 px-4 py-2 bg-green-500/15 text-green-400 text-sm font-medium rounded-lg hover:bg-green-500/25 border border-green-500/20 transition-all">
-                <Check size={14} /> {t.approve}
-              </button>
-              <button onClick={() => onReject(ticket.id)} className="flex items-center gap-2 px-4 py-2 bg-red-500/15 text-red-400 text-sm font-medium rounded-lg hover:bg-red-500/25 border border-red-500/20 transition-all">
-                <XCircle size={14} /> {t.reject}
-              </button>
-            </>
+          {ticket.status === 'review' && onReview && (
+            <button
+              onClick={() => { onClose(); onReview(ticket); }}
+              className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-violet-600 to-indigo-600 text-white text-sm font-semibold rounded-xl hover:from-violet-500 hover:to-indigo-500 shadow-md shadow-violet-500/20 hover:shadow-violet-500/30 transition-all"
+            >
+              {t.viewChanges}
+            </button>
           )}
           {ticket.status === 'rejected' && (
             <button onClick={() => onRetry(ticket.id)} className="flex items-center gap-2 px-4 py-2 bg-blue-500/15 text-blue-400 text-sm font-medium rounded-lg hover:bg-blue-500/25 border border-blue-500/20 transition-all">

@@ -121,6 +121,7 @@ h1{color:#f59e0b}code{background:#27272a;padding:2px 6px;border-radius:4px;font-
 
       codingResult = {
         files: [{ path: 'index.html', content: testHtml }],
+        baseFiles: [],
         summary: 'Test deploy (skip_coding)',
         diff: '',
         linesAdded: 10,
@@ -129,6 +130,7 @@ h1{color:#f59e0b}code{background:#27272a;padding:2px 6px;border-radius:4px;font-
         costUsd: 0,
         branchName: `crab-test-${ticket.id}`,
         repoDir: '',
+        previewPath: '',
       };
 
       repo.updateTicketFields(ticket.id, {
@@ -260,25 +262,34 @@ h1{color:#f59e0b}code{background:#27272a;padding:2px 6px;border-radius:4px;font-
 
       const deployResult = await deployer.deployToStaging(ticket, codingResult);
 
-      // Store coding files for later use (approve → production deploy)
+      // Save coding files + base files to filesystem for later use (approve → 3-way merge)
       if (codingResult.files && codingResult.files.length > 0) {
-        repo.insertLog(ticket.id, JSON.stringify(codingResult.files), 'coding_files', 'deploying');
+        deployer.saveTicketFiles(ticket.id, codingResult.files, codingResult.baseFiles || []);
+      }
+
+      // Append preview path so the iframe opens on the right page/section
+      let stagingUrl = deployResult.stagingUrl;
+      if (stagingUrl && codingResult.previewPath) {
+        const pp = codingResult.previewPath.startsWith('/') || codingResult.previewPath.startsWith('#')
+          ? codingResult.previewPath
+          : `/${codingResult.previewPath}`;
+        stagingUrl = stagingUrl.replace(/\/+$/, '') + pp;
       }
 
       repo.updateTicketFields(ticket.id, {
         status: 'review',
         pr_url: deployResult.prUrl,
         pr_id: deployResult.prId,
-        staging_url: deployResult.stagingUrl,
+        staging_url: stagingUrl,
         progress: 100,
         pipeline_step: 7,
       });
 
       emitTicketStatus(ticket.id, 'review', 100, projectId);
-      emitTicketUpdated(ticket.id, { staging_url: deployResult.stagingUrl, pr_url: deployResult.prUrl }, projectId);
-      emitTicketLog(ticket.id, `PR créée : ${deployResult.prUrl}`, 'success', 'deploying', projectId);
-      repo.insertLog(ticket.id, `PR créée : ${deployResult.prUrl}`, 'success', 'deploying');
-      repo.insertActivity(ticket.id, `Déployé - PR : ${deployResult.prUrl}`, 'push');
+      emitTicketUpdated(ticket.id, { staging_url: stagingUrl, pr_url: deployResult.prUrl }, projectId);
+      emitTicketLog(ticket.id, 'Déployé avec succès', 'success', 'deploying', projectId);
+      repo.insertLog(ticket.id, 'Déployé avec succès', 'success', 'deploying');
+      repo.insertActivity(ticket.id, 'Déployé en staging', 'push');
 
       emitNotification(`Ticket #${ticket.id} prêt pour review`, 'success', projectId);
     } else {
@@ -315,31 +326,42 @@ router.post('/approve/:id', async (req: Request, res: Response) => {
   }
 
   const projectId = req.project!.id;
+  const userId = req.user!.userId;
+  const userEmail = req.user!.email;
 
-  try {
-    await deployer.mergeToProduction(ticket);
-
-    // Update staging_url to CF production URL so "Voir le site" points to the live site
-    const deployConfig = repo.findDeployConfigByProject(projectId);
-    const approveFields: Record<string, any> = { pipeline_step: 8 };
-    if (deployConfig?.cf_site_url) {
-      approveFields.staging_url = deployConfig.cf_site_url;
+  // Update UI immediately — heavy work (merge, CF deploy) runs in background
+  const deployConfig = repo.findDeployConfigByProject(projectId);
+  const approveFields: Record<string, any> = { pipeline_step: 8 };
+  if (deployConfig?.cf_site_url) {
+    // Preserve the page path from staging_url (e.g. /about.html)
+    let prodUrl = deployConfig.cf_site_url;
+    if (ticket.staging_url) {
+      try {
+        const stagingParsed = new URL(ticket.staging_url);
+        if (stagingParsed.pathname && stagingParsed.pathname !== '/') {
+          prodUrl = prodUrl.replace(/\/+$/, '') + stagingParsed.pathname;
+        }
+      } catch { /* ignore parse errors */ }
     }
-
-    repo.updateTicketStatus(ticket.id, 'approved', 100);
-    repo.updateTicketFields(ticket.id, approveFields);
-    fileLocker.unlock(ticket.id);
-
-    repo.insertActivity(ticket.id, 'Ticket approuvé et mergé', 'approve');
-    emitTicketStatus(ticket.id, 'approved', 100, projectId);
-    emitNotification(`Ticket #${ticket.id} approuvé et déployé`, 'success', projectId);
-
-    repo.insertAuditLog(req.user!.userId, req.user!.email, 'pipeline_approve', 'ticket', ticketId);
-    res.json({ success: true });
-  } catch (err: unknown) {
-    logger.error('[Pipeline] Error:', err);
-    res.status(500).json({ error: 'An internal error occurred' });
+    approveFields.staging_url = prodUrl;
   }
+
+  repo.updateTicketStatus(ticket.id, 'approved', 100);
+  repo.updateTicketFields(ticket.id, approveFields);
+  fileLocker.unlock(ticket.id);
+
+  repo.insertActivity(ticket.id, 'Ticket approuvé et mergé', 'approve');
+  emitTicketStatus(ticket.id, 'approved', 100, projectId);
+  emitNotification(`Ticket #${ticket.id} approuvé et déployé`, 'success', projectId);
+  repo.insertAuditLog(userId, userEmail, 'pipeline_approve', 'ticket', ticketId);
+
+  res.json({ success: true });
+
+  // Background: merge PR + deploy to CF Pages production
+  deployer.mergeToProduction(ticket).catch(err => {
+    logger.error(`[Pipeline] Background approve deploy failed for #${ticketId}:`, err);
+    emitTicketLog(ticket.id, 'Erreur déploiement production (en arrière-plan)', 'warning', 'deploying', projectId);
+  });
 });
 
 // POST /api/pipeline/reject/:id
@@ -357,23 +379,22 @@ router.post('/reject/:id', async (req: Request, res: Response) => {
 
   const projectId = req.project!.id;
 
-  try {
-    await deployer.closePR(ticket);
+  // Update UI immediately — closing PR runs in background
+  repo.updateTicketStatus(ticket.id, 'rejected', 0);
+  repo.updateTicketFields(ticket.id, { pipeline_step: 0 });
+  fileLocker.unlock(ticket.id);
 
-    repo.updateTicketStatus(ticket.id, 'rejected', 0);
-    repo.updateTicketFields(ticket.id, { pipeline_step: 0 });
-    fileLocker.unlock(ticket.id);
+  repo.insertActivity(ticket.id, 'Ticket rejeté', 'reject');
+  emitTicketStatus(ticket.id, 'rejected', 0, projectId);
+  emitNotification(`Ticket #${ticket.id} rejeté`, 'warning', projectId);
+  repo.insertAuditLog(req.user!.userId, req.user!.email, 'pipeline_reject', 'ticket', ticketId);
 
-    repo.insertActivity(ticket.id, 'Ticket rejeté', 'reject');
-    emitTicketStatus(ticket.id, 'rejected', 0, projectId);
-    emitNotification(`Ticket #${ticket.id} rejeté`, 'warning', projectId);
+  res.json({ success: true });
 
-    repo.insertAuditLog(req.user!.userId, req.user!.email, 'pipeline_reject', 'ticket', ticketId);
-    res.json({ success: true });
-  } catch (err: unknown) {
-    logger.error('[Pipeline] Error:', err);
-    res.status(500).json({ error: 'An internal error occurred' });
-  }
+  // Background: close PR on git provider
+  deployer.closePR(ticket).catch(err => {
+    logger.error(`[Pipeline] Background PR close failed for #${ticketId}:`, err);
+  });
 });
 
 // POST /api/pipeline/retry/:id

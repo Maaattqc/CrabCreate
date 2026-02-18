@@ -48,6 +48,7 @@ export async function autoCreateRepo(
       provider_token: token,
       clone_url: cloneUrl,
       default_branch: 'main',
+      target_branch: 'develop',
       bitbucket_workspace: '',
       bitbucket_repo_slug: '',
     });

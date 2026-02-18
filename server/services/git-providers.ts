@@ -61,12 +61,31 @@ class GitHubProvider implements GitProvider {
   }
 
   async createPR(branch: string, target: string, title: string, body: string): Promise<{ id: number; url: string }> {
-    const res = await axios.post(
-      `https://api.github.com/repos/${this.owner}/${this.repo}/pulls`,
-      { title, body, head: branch, base: target },
-      { headers: this.headers() },
-    );
-    return { id: res.data.number, url: res.data.html_url };
+    try {
+      const res = await axios.post(
+        `https://api.github.com/repos/${this.owner}/${this.repo}/pulls`,
+        { title, body, head: branch, base: target },
+        { headers: this.headers() },
+      );
+      return { id: res.data.number, url: res.data.html_url };
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err) && err.response) {
+        const ghErrors = JSON.stringify(err.response.data?.errors || err.response.data || {});
+        console.error(`[GitHub] createPR failed (${err.response.status}): ${ghErrors}`);
+
+        // 422 = PR already exists for this branch — find and return the existing one
+        if (err.response.status === 422) {
+          const existing = await axios.get(
+            `https://api.github.com/repos/${this.owner}/${this.repo}/pulls?head=${this.owner}:${branch}&state=open`,
+            { headers: this.headers() },
+          );
+          if (existing.data.length > 0) {
+            return { id: existing.data[0].number, url: existing.data[0].html_url };
+          }
+        }
+      }
+      throw err;
+    }
   }
 
   async mergePR(prId: number, strategy: string): Promise<void> {

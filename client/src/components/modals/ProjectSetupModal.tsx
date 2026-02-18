@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { X, Github, GitBranch, Cloud, ChevronRight, Check, Loader2, Plus, Link } from 'lucide-react';
+import { X, Github, GitBranch, Cloud, ChevronRight, Check, Loader2, Plus, Link, XCircle, Wifi } from 'lucide-react';
 import { useLanguage } from '../../hooks/useLanguage';
-import { connectRepo, createNewRepo, configureDeploy, skipDeploy } from '../../api/project-setup';
+import { connectRepo, createNewRepo, configureDeploy, skipDeploy, testConnection } from '../../api/project-setup';
 import type { GitProviderType } from '../../types';
 
 interface ProjectSetupModalProps {
@@ -30,7 +30,28 @@ export default function ProjectSetupModal({ onClose, onComplete }: ProjectSetupM
   const [token, setToken] = useState('');
   const [owner, setOwner] = useState('');
   const [repoName, setRepoName] = useState('');
-  const [branch, setBranch] = useState('main');
+  const [branch, setBranch] = useState('master');
+  const [targetBranch, setTargetBranch] = useState('develop');
+
+  // Test connection
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<'success' | 'fail' | null>(null);
+
+  const handleTestConnection = async () => {
+    setTesting(true);
+    setTestResult(null);
+    setError('');
+    try {
+      const res = await testConnection({ provider, token, owner, repo: repoName });
+      setTestResult(res.success ? 'success' : 'fail');
+      if (!res.success && res.error) setError(res.error);
+    } catch (err) {
+      setTestResult('fail');
+      setError((err as Error).message);
+    } finally {
+      setTesting(false);
+    }
+  };
 
   // Create repo fields
   const [newRepoName, setNewRepoName] = useState('');
@@ -41,7 +62,7 @@ export default function ProjectSetupModal({ onClose, onComplete }: ProjectSetupM
     setLoading(true);
     setError('');
     try {
-      await connectRepo({ provider, owner, repo: repoName, token, branch });
+      await connectRepo({ provider, owner, repo: repoName, token, branch, target_branch: targetBranch });
       setStep('deploy');
     } catch (err) {
       setError((err as Error).message);
@@ -55,7 +76,7 @@ export default function ProjectSetupModal({ onClose, onComplete }: ProjectSetupM
     setLoading(true);
     setError('');
     try {
-      await createNewRepo({ provider, token, repoName: newRepoName, isPrivate });
+      await createNewRepo({ provider, token, repoName: newRepoName, isPrivate, target_branch: targetBranch });
       setStep('deploy');
     } catch (err) {
       setError((err as Error).message);
@@ -204,20 +225,48 @@ export default function ProjectSetupModal({ onClose, onComplete }: ProjectSetupM
                     </div>
                   </div>
 
-                  <div>
-                    <label className="text-sm font-medium text-tx-secondary block mb-1">{t.setupBranch}</label>
-                    <input
-                      type="text"
-                      value={branch}
-                      onChange={e => setBranch(e.target.value)}
-                      className="w-full bg-subtle border border-th-border rounded-lg px-3 py-2 text-sm text-tx-primary placeholder-tx-faint focus:outline-none focus:border-amber-500/50"
-                    />
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-sm font-medium text-tx-secondary block mb-1">{t.setupSourceBranch}</label>
+                      <input
+                        type="text"
+                        value={branch}
+                        onChange={e => setBranch(e.target.value)}
+                        className="w-full bg-subtle border border-th-border rounded-lg px-3 py-2 text-sm text-tx-primary placeholder-tx-faint focus:outline-none focus:border-amber-500/50"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-tx-secondary block mb-1">{t.setupTargetBranch}</label>
+                      <input
+                        type="text"
+                        value={targetBranch}
+                        onChange={e => setTargetBranch(e.target.value)}
+                        className="w-full bg-subtle border border-th-border rounded-lg px-3 py-2 text-sm text-tx-primary placeholder-tx-faint focus:outline-none focus:border-amber-500/50"
+                      />
+                    </div>
                   </div>
+
+                  <button
+                    type="button"
+                    onClick={handleTestConnection}
+                    disabled={testing || !token || !provider}
+                    className="w-full py-2 rounded-lg border border-th-border text-sm text-tx-secondary hover:bg-subtle-hover transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {testing ? (
+                      <><Loader2 size={14} className="animate-spin" /> {t.setupTesting}</>
+                    ) : testResult === 'success' ? (
+                      <><Check size={14} className="text-green-400" /> <span className="text-green-400">{t.setupTestConnectionSuccess}</span></>
+                    ) : testResult === 'fail' ? (
+                      <><XCircle size={14} className="text-red-400" /> <span className="text-red-400">{t.setupTestConnectionFail}</span></>
+                    ) : (
+                      <><Wifi size={14} /> {t.setupTestConnection}</>
+                    )}
+                  </button>
 
                   {error && <p className="text-sm text-red-400">{error}</p>}
 
                   <div className="flex gap-3 pt-1">
-                    <button type="button" onClick={() => { setRepoMode(null); setError(''); }} className="flex-1 py-2.5 rounded-lg border border-th-border text-sm text-tx-faint hover:bg-subtle-hover transition-colors">
+                    <button type="button" onClick={() => { setRepoMode(null); setError(''); setTestResult(null); }} className="flex-1 py-2.5 rounded-lg border border-th-border text-sm text-tx-faint hover:bg-subtle-hover transition-colors">
                       {t.setupBack}
                     </button>
                     <button

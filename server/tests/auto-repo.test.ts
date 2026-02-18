@@ -171,6 +171,7 @@ describe('auto-repo service', () => {
         provider_repo: 'my-project',
         provider_token: 'ghp_test123',
         default_branch: 'main',
+        target_branch: 'develop',
       }));
       expect(mocks.updateProject).toHaveBeenCalledWith(1, { default_repo: 'proj-1' });
       expect(mocks.updateProjectSetup).toHaveBeenCalledWith(1, true);

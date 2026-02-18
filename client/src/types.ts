@@ -342,6 +342,7 @@ export interface ConnectRepoPayload {
   repo: string;
   token: string;
   branch: string;
+  target_branch?: string;
 }
 
 export interface CreateRepoPayload {
@@ -349,6 +350,7 @@ export interface CreateRepoPayload {
   token: string;
   repoName: string;
   isPrivate: boolean;
+  target_branch?: string;
 }
 
 export type ConfigureDeployPayload = Record<string, never>;

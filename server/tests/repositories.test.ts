@@ -82,6 +82,7 @@ const MIGRATION_SQL = `
     bitbucket_workspace TEXT,
     bitbucket_repo_slug TEXT,
     default_branch TEXT DEFAULT 'master',
+    target_branch TEXT DEFAULT 'develop',
     local_path TEXT,
     created_at TEXT DEFAULT (datetime('now'))
   );
