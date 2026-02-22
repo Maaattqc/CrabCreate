@@ -58,6 +58,12 @@ const MIGRATION_SQL = `
     last_modified_by INTEGER,
     position INTEGER DEFAULT 0,
     due_date TEXT,
+    archived_at TEXT,
+    pipeline_step INTEGER DEFAULT 0,
+    column_position INTEGER DEFAULT 0,
+    pipeline_started_at TEXT,
+    creator_email TEXT,
+    modifier_email TEXT,
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now'))
   );
@@ -66,9 +72,19 @@ const MIGRATION_SQL = `
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     ticket_id INTEGER NOT NULL REFERENCES kanban_tickets(id) ON DELETE CASCADE,
     title TEXT NOT NULL,
+    description TEXT DEFAULT '',
     completed INTEGER DEFAULT 0,
     position INTEGER DEFAULT 0,
+    ai_generated INTEGER DEFAULT 0,
     created_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS kanban_status_transitions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ticket_id INTEGER NOT NULL REFERENCES kanban_tickets(id) ON DELETE CASCADE,
+    from_status TEXT,
+    to_status TEXT NOT NULL,
+    changed_at TEXT DEFAULT (datetime('now'))
   );
 `;
 
@@ -87,6 +103,7 @@ import {
   findSubtaskById,
   updateSubtask,
   deleteSubtask,
+  deleteAiSubtasksByTicketId,
   toggleSubtask,
 } from '../db/repositories';
 
@@ -193,5 +210,55 @@ describe('Subtask repository', () => {
 
   it('findSubtaskById returns undefined for non-existent', () => {
     expect(findSubtaskById(999)).toBeUndefined();
+  });
+
+  it('createSubtask with description and ai_generated', () => {
+    const { user, project } = createTestProject();
+    const ticket = createTicket({ title: 'Test ticket' }, user.id, project.id);
+
+    const subtask = createSubtask(ticket.id, 'AI subtask', 'Detailed description', true);
+
+    expect(subtask).toBeDefined();
+    expect(subtask.title).toBe('AI subtask');
+    expect(subtask.description).toBe('Detailed description');
+    expect(subtask.ai_generated).toBe(1);
+  });
+
+  it('createSubtask defaults description to empty string', () => {
+    const { user, project } = createTestProject();
+    const ticket = createTicket({ title: 'Test ticket' }, user.id, project.id);
+
+    const subtask = createSubtask(ticket.id, 'Manual subtask');
+
+    expect(subtask.description).toBe('');
+    expect(subtask.ai_generated).toBe(0);
+  });
+
+  it('deleteAiSubtasksByTicketId removes only AI subtasks', () => {
+    const { user, project } = createTestProject();
+    const ticket = createTicket({ title: 'Test ticket' }, user.id, project.id);
+
+    createSubtask(ticket.id, 'Manual subtask');
+    createSubtask(ticket.id, 'AI subtask 1', 'desc1', true);
+    createSubtask(ticket.id, 'AI subtask 2', 'desc2', true);
+
+    expect(findSubtasksByTicketId(ticket.id)).toHaveLength(3);
+
+    deleteAiSubtasksByTicketId(ticket.id);
+
+    const remaining = findSubtasksByTicketId(ticket.id);
+    expect(remaining).toHaveLength(1);
+    expect(remaining[0].title).toBe('Manual subtask');
+  });
+
+  it('updateSubtask updates description', () => {
+    const { user, project } = createTestProject();
+    const ticket = createTicket({ title: 'Test ticket' }, user.id, project.id);
+    const subtask = createSubtask(ticket.id, 'Task', 'Original desc');
+
+    const updated = updateSubtask(subtask.id, { description: 'Updated desc' });
+
+    expect(updated).toBeDefined();
+    expect(updated!.description).toBe('Updated desc');
   });
 });

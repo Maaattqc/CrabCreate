@@ -122,7 +122,8 @@ describe('ProjectSetupModal', () => {
         owner: 'test-org',
         repo: 'test-repo',
         token: 'my-token',
-        branch: 'main',
+        branch: 'master',
+        target_branch: 'develop',
       });
     });
 

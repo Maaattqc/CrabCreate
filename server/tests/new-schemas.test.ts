@@ -18,6 +18,16 @@ describe('createSubtaskSchema', () => {
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.title).toBe('Write tests');
+      expect(result.data.description).toBe('');
+    }
+  });
+
+  it('accepts valid input with description', () => {
+    const result = createSubtaskSchema.safeParse({ title: 'Write tests', description: 'Unit tests for auth' });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.title).toBe('Write tests');
+      expect(result.data.description).toBe('Unit tests for auth');
     }
   });
 

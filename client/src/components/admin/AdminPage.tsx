@@ -144,7 +144,7 @@ export default function AdminPage() {
   const [settings, setSettings] = useState<AdminSettings | null>(null);
   const [settingsDraft, setSettingsDraft] = useState<AdminSettings>({
     max_requests_per_minute: 60, max_tickets_per_hour: 10, max_concurrent_pipelines: 2,
-    default_ai_model: 'claude', ai_review_threshold: 70, ai_max_tokens: 8000,
+    default_ai_model: 'gpt', ai_review_threshold: 70, ai_max_tokens: 8000,
     dev_login_enabled: 0, registration_enabled: 1, session_duration_days: 7,
     auto_test_enabled: 1, auto_deploy_enabled: 0, maintenance_mode: 0, log_retention_days: 30,
     plan_free_tickets: 5, plan_free_pipelines: 1, plan_pro_tickets: 50, plan_pro_pipelines: 3,
@@ -778,7 +778,7 @@ function SettingsTab({
       color: 'text-purple-400',
       bgTint: 'bg-purple-500/10',
       fields: [
-        { type: 'select', key: 'default_ai_model', label: t.settingsDefaultModel, desc: t.settingsDefaultModelDesc, options: [{ value: 'claude', label: 'Claude' }, { value: 'gpt', label: 'GPT-5' }] },
+        { type: 'select', key: 'default_ai_model', label: t.settingsDefaultModel, desc: t.settingsDefaultModelDesc, options: [{ value: 'gpt', label: 'GPT-5' }, { value: 'claude', label: 'Claude' }] },
         { type: 'number', key: 'ai_review_threshold', label: t.settingsReviewThreshold, desc: t.settingsReviewThresholdDesc, min: 0, max: 100 },
         { type: 'number', key: 'ai_max_tokens', label: t.settingsMaxTokens, desc: t.settingsMaxTokensDesc, min: 1024, max: 32000 },
         { type: 'number', key: 'ai_tokens_complexity', label: t.settingsTokensComplexity, desc: t.settingsTokensComplexityDesc, min: 200, max: 2000 },

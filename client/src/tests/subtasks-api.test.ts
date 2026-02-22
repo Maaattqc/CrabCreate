@@ -5,8 +5,10 @@ const mockSubtask = {
   id: 1,
   ticket_id: 42,
   title: 'Write unit tests',
+  description: '',
   completed: 0,
   position: 0,
+  ai_generated: 0,
   created_at: '2026-01-15',
 };
 

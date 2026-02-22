@@ -6,6 +6,7 @@ import {
   hashAuthCode,
 } from '../services/secrets';
 import { isAllowedProjectRepoId } from '../security/project-repo';
+import logger from '../services/logger';
 
 /** Escape LIKE wildcard characters in user input */
 function escapeLike(str: string): string {
@@ -104,7 +105,9 @@ export function findAllTickets(filters: Record<string, string>, userId?: number,
     params.push(`%${escapeLike(filters.search)}%`, `%${escapeLike(filters.search)}%`);
   }
 
-  sql += " ORDER BY CASE WHEN t.status = 'backlog' THEN t.position ELSE 2147483647 END ASC, t.updated_at ASC LIMIT ? OFFSET ?";
+  sql += ` ORDER BY
+    CASE WHEN t.status = 'backlog' THEN t.position ELSE t.column_position END ASC
+    LIMIT ? OFFSET ?`;
   const safeLimit = Math.min(Math.max(1, limit), 500);
   params.push(safeLimit, Math.max(0, offset));
   return db.prepare(sql).all(...params) as Ticket[];
@@ -131,7 +134,7 @@ export function createTicket(data: Partial<Ticket>, userId?: number, projectId?:
     data.description || '',
     data.priority || 'medium',
     data.template || 'feature',
-    data.ai_model || 'claude',
+    data.ai_model || 'gpt',
     data.repo || 'main-site',
     data.assignee || 'unassigned',
     typeof data.target_files === 'string' ? data.target_files : JSON.stringify(data.target_files || []),
@@ -151,6 +154,8 @@ export function createTicket(data: Partial<Ticket>, userId?: number, projectId?:
 
   // Record initial status transition
   insertStatusTransition(ticket.id, null, ticket.status || 'backlog');
+
+  logger.info(`[TICKET-CREATE] ticket=#${ticket.id} title="${ticket.title}" status=backlog position=${nextPos} project=${projectId ?? 'null'}`);
 
   return ticket;
 }
@@ -179,7 +184,7 @@ export function updateTicket(id: number, fields: Record<string, any>, modifiedBy
     'repo', 'assignee', 'complexity', 'target_files', 'tags', 'depends_on',
     'branch_name', 'pr_url', 'pr_id', 'staging_url', 'lines_added', 'lines_removed',
     'tokens_used', 'cost_usd', 'ai_review_score', 'ai_review_data', 'test_results', 'progress', 'position',
-    'due_date', 'pipeline_step',
+    'due_date', 'pipeline_step', 'pipeline_started_at',
   ];
 
   const updates: string[] = [];
@@ -219,11 +224,35 @@ export function deleteTicket(id: number): void {
   db.prepare('DELETE FROM kanban_tickets WHERE id = ?').run(id);
 }
 
+/** Statuses that form the continuous pipeline flow — column_position stays stable within this set. */
+const PIPELINE_FLOW_STATUSES = new Set(['estimating', 'ai_coding', 'ai_review', 'testing', 'deploying']);
+
+/** Get the next column_position for a ticket entering a new status. */
+export function getNextColumnPosition(status: string, projectId: number | null): number {
+  const row = db.prepare(
+    'SELECT COALESCE(MAX(column_position), 0) + 1 AS next FROM kanban_tickets WHERE status = ? AND project_id IS ?'
+  ).get(status, projectId) as { next: number };
+  logger.info(`[COL-POS] getNextColumnPosition(status="${status}", project=${projectId}) → ${row.next}`);
+  return row.next;
+}
+
 export function updateTicketStatus(id: number, status: string, progress: number): void {
-  const current = db.prepare('SELECT status FROM kanban_tickets WHERE id = ?').get(id) as { status: string } | undefined;
-  db.prepare("UPDATE kanban_tickets SET status = ?, progress = ?, updated_at = datetime('now') WHERE id = ?").run(status, progress, id);
+  const current = db.prepare('SELECT status, project_id, column_position FROM kanban_tickets WHERE id = ?').get(id) as { status: string; project_id: number | null; column_position: number } | undefined;
   if (current && current.status !== status) {
+    // Keep column_position stable within the pipeline flow (order set at launch)
+    const withinPipeline = PIPELINE_FLOW_STATUSES.has(current.status) && PIPELINE_FLOW_STATUSES.has(status);
+    if (withinPipeline) {
+      logger.info(`[STATUS] ticket=#${id} "${current.status}" → "${status}" (pipeline flow, keep col_pos=${current.column_position})`);
+      db.prepare("UPDATE kanban_tickets SET status = ?, progress = ?, updated_at = datetime('now') WHERE id = ?").run(status, progress, id);
+    } else {
+      const colPos = getNextColumnPosition(status, current.project_id);
+      logger.info(`[STATUS] ticket=#${id} "${current.status}" → "${status}" (new col_pos=${colPos})`);
+      db.prepare("UPDATE kanban_tickets SET status = ?, progress = ?, column_position = ?, updated_at = datetime('now') WHERE id = ?").run(status, progress, colPos, id);
+    }
     insertStatusTransition(id, current.status, status);
+  } else {
+    logger.info(`[STATUS] ticket=#${id} status="${status}" progress=${progress} (same status, no col change)`);
+    db.prepare("UPDATE kanban_tickets SET status = ?, progress = ?, updated_at = datetime('now') WHERE id = ?").run(status, progress, id);
   }
 }
 
@@ -232,7 +261,7 @@ const TICKET_UPDATABLE_FIELDS = new Set([
   'repo', 'assignee', 'complexity', 'target_files', 'tags', 'depends_on',
   'branch_name', 'pr_url', 'pr_id', 'staging_url', 'lines_added', 'lines_removed',
   'tokens_used', 'cost_usd', 'ai_review_score', 'ai_review_data', 'test_results', 'progress',
-  'pipeline_step',
+  'pipeline_step', 'pipeline_started_at',
 ]);
 
 export function updateTicketFields(id: number, fields: Record<string, any>): void {
@@ -247,11 +276,21 @@ export function updateTicketFields(id: number, fields: Record<string, any>): voi
 
   if (updates.length === 0) return;
 
-  // Record status transition if status is changing
+  // Record status transition + assign column_position if status is changing
   if (fields.status !== undefined) {
-    const current = db.prepare('SELECT status FROM kanban_tickets WHERE id = ?').get(id) as { status: string } | undefined;
+    const current = db.prepare('SELECT status, project_id, column_position FROM kanban_tickets WHERE id = ?').get(id) as { status: string; project_id: number | null; column_position: number } | undefined;
     if (current && current.status !== fields.status) {
       insertStatusTransition(id, current.status, fields.status);
+      // Keep column_position stable within the pipeline flow (order set at launch)
+      const withinPipeline = PIPELINE_FLOW_STATUSES.has(current.status) && PIPELINE_FLOW_STATUSES.has(fields.status);
+      if (!withinPipeline) {
+        const colPos = getNextColumnPosition(fields.status, current.project_id);
+        logger.info(`[FIELDS-STATUS] ticket=#${id} "${current.status}" → "${fields.status}" (new col_pos=${colPos})`);
+        updates.push('column_position = ?');
+        values.push(colPos);
+      } else {
+        logger.info(`[FIELDS-STATUS] ticket=#${id} "${current.status}" → "${fields.status}" (pipeline flow, keep col_pos=${current.column_position})`);
+      }
     }
   }
 
@@ -271,6 +310,49 @@ export function unarchiveTicket(id: number): void {
 
 export function findQueuedTickets(): Ticket[] {
   return db.prepare("SELECT * FROM kanban_tickets WHERE status = 'queued' ORDER BY priority DESC, created_at ASC").all() as Ticket[];
+}
+
+// ── Pipeline Recovery ─────────────────────────────────────────────────────────
+
+const ACTIVE_PIPELINE_STATUSES = ['estimating', 'ai_coding', 'ai_review', 'testing', 'deploying'];
+
+/** Find all tickets currently in an active pipeline status. */
+export function findStuckPipelineTickets(): Ticket[] {
+  const placeholders = ACTIVE_PIPELINE_STATUSES.map(() => '?').join(',');
+  return db.prepare(
+    `SELECT * FROM kanban_tickets WHERE status IN (${placeholders})`
+  ).all(...ACTIVE_PIPELINE_STATUSES) as Ticket[];
+}
+
+/** Find tickets in pipeline that started more than maxMinutes ago. */
+export function findStalePipelineTickets(maxMinutes: number): Ticket[] {
+  const placeholders = ACTIVE_PIPELINE_STATUSES.map(() => '?').join(',');
+  return db.prepare(
+    `SELECT * FROM kanban_tickets WHERE status IN (${placeholders})
+     AND pipeline_started_at IS NOT NULL
+     AND pipeline_started_at < datetime('now', ?)`
+  ).all(...ACTIVE_PIPELINE_STATUSES, `-${maxMinutes} minutes`) as Ticket[];
+}
+
+/** Reset a stuck ticket back to backlog. */
+export function resetStuckTicket(ticketId: number): void {
+  const current = db.prepare('SELECT status FROM kanban_tickets WHERE id = ?').get(ticketId) as { status: string } | undefined;
+  const fromStatus = current?.status || 'unknown';
+  db.prepare(
+    "UPDATE kanban_tickets SET status = 'backlog', progress = 0, pipeline_step = 0, pipeline_started_at = NULL, updated_at = datetime('now') WHERE id = ?"
+  ).run(ticketId);
+  insertStatusTransition(ticketId, fromStatus, 'backlog');
+}
+
+/** Re-queue a stuck ticket so the pipeline auto-relaunches it.
+ *  pipeline_step is preserved intentionally so crash recovery can resume at the right step. */
+export function requeueStuckTicket(ticketId: number): void {
+  const current = db.prepare('SELECT status FROM kanban_tickets WHERE id = ?').get(ticketId) as { status: string } | undefined;
+  const fromStatus = current?.status || 'unknown';
+  db.prepare(
+    "UPDATE kanban_tickets SET status = 'queued', progress = 0, pipeline_started_at = NULL, updated_at = datetime('now') WHERE id = ?"
+  ).run(ticketId);
+  insertStatusTransition(ticketId, fromStatus, 'queued');
 }
 
 // ── Status Transitions ──────────────────────────────────────────────────────
@@ -1160,16 +1242,21 @@ export function findSubtasksByTicketId(ticketId: number): Subtask[] {
   return db.prepare('SELECT * FROM kanban_subtasks WHERE ticket_id = ? ORDER BY position ASC, id ASC').all(ticketId) as Subtask[];
 }
 
-export function createSubtask(ticketId: number, title: string): Subtask {
+export function createSubtask(ticketId: number, title: string, description = '', aiGenerated = false): Subtask {
   const maxPos = db.prepare('SELECT COALESCE(MAX(position), -1) + 1 as next_pos FROM kanban_subtasks WHERE ticket_id = ?').get(ticketId) as { next_pos: number };
-  const result = db.prepare('INSERT INTO kanban_subtasks (ticket_id, title, position) VALUES (?, ?, ?)').run(ticketId, title, maxPos.next_pos);
+  const result = db.prepare('INSERT INTO kanban_subtasks (ticket_id, title, description, ai_generated, position) VALUES (?, ?, ?, ?, ?)').run(ticketId, title, description, aiGenerated ? 1 : 0, maxPos.next_pos);
   return db.prepare('SELECT * FROM kanban_subtasks WHERE id = ?').get(result.lastInsertRowid) as Subtask;
 }
 
-export function updateSubtask(id: number, fields: { title?: string; completed?: number; position?: number }): Subtask | undefined {
+export function deleteAiSubtasksByTicketId(ticketId: number): void {
+  db.prepare('DELETE FROM kanban_subtasks WHERE ticket_id = ? AND ai_generated = 1').run(ticketId);
+}
+
+export function updateSubtask(id: number, fields: { title?: string; description?: string; completed?: number; position?: number }): Subtask | undefined {
   const updates: string[] = [];
   const values: (string | number)[] = [];
   if (fields.title !== undefined) { updates.push('title = ?'); values.push(fields.title); }
+  if (fields.description !== undefined) { updates.push('description = ?'); values.push(fields.description); }
   if (fields.completed !== undefined) { updates.push('completed = ?'); values.push(fields.completed); }
   if (fields.position !== undefined) { updates.push('position = ?'); values.push(fields.position); }
   if (updates.length === 0) return undefined;

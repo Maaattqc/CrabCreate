@@ -205,7 +205,7 @@ export default function TicketCard({ ticket, onClick, onLaunch, onArchive, onRev
             <Settings size={15} />
           </button>
           <div className="flex-1 flex items-center justify-center gap-2">
-            <span className="text-sm font-mono text-tx-muted">#{ticket.id}</span>
+            {/* #{ticket.id} hidden by design */}
             {ticket.ai_review_score != null && (
               <span className={`text-sm font-mono font-semibold px-2 py-0.5 rounded-md ${
                 ticket.ai_review_score >= 70 ? 'text-green-400 bg-green-500/15' :

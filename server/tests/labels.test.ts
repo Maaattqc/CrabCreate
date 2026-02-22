@@ -58,6 +58,12 @@ const MIGRATION_SQL = `
     last_modified_by INTEGER,
     position INTEGER DEFAULT 0,
     due_date TEXT,
+    archived_at TEXT,
+    pipeline_step INTEGER DEFAULT 0,
+    column_position INTEGER DEFAULT 0,
+    pipeline_started_at TEXT,
+    creator_email TEXT,
+    modifier_email TEXT,
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now'))
   );
@@ -74,6 +80,14 @@ const MIGRATION_SQL = `
     ticket_id INTEGER NOT NULL REFERENCES kanban_tickets(id) ON DELETE CASCADE,
     label_id INTEGER NOT NULL REFERENCES kanban_labels(id) ON DELETE CASCADE,
     PRIMARY KEY (ticket_id, label_id)
+  );
+
+  CREATE TABLE IF NOT EXISTS kanban_status_transitions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ticket_id INTEGER NOT NULL REFERENCES kanban_tickets(id) ON DELETE CASCADE,
+    from_status TEXT,
+    to_status TEXT NOT NULL,
+    changed_at TEXT DEFAULT (datetime('now'))
   );
 `;
 

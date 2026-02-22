@@ -6,6 +6,7 @@ import { useSocket } from '../../hooks/useSocket';
 import { useProject } from '../../hooks/useProject';
 import { useTypingIndicator } from '../../hooks/useCollaboration';
 import { getProjectMembers } from '../../api/projects';
+import VoiceTextarea from '../common/VoiceTextarea';
 import * as commentsApi from '../../api/comments';
 import type { Comment, ProjectMember } from '../../types';
 
@@ -321,7 +322,7 @@ export default function CommentsTab({ ticketId }: CommentsTabProps) {
           </div>
         )}
         <div className="flex gap-2">
-          <textarea
+          <VoiceTextarea
             ref={inputRef}
             value={newComment}
             onChange={e => handleInputChange(e.target.value)}
@@ -337,6 +338,7 @@ export default function CommentsTab({ ticketId }: CommentsTabProps) {
             placeholder={t.commentsPlaceholder}
             className="flex-1 bg-subtle border border-th-border rounded-lg px-3 py-2 text-sm text-tx-primary placeholder-tx-ghost focus:outline-none focus:border-amber-500/50 resize-none min-h-[38px] max-h-[120px]"
             rows={1}
+            containerClassName="flex-1"
           />
           <button
             onClick={handleSend}

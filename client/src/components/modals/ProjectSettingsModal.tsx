@@ -4,6 +4,8 @@ import { useLanguage } from '../../hooks/useLanguage';
 import { useProject } from '../../hooks/useProject';
 import * as projectsApi from '../../api/projects';
 import WebhooksPanel from './WebhooksPanel';
+import VoiceInput from '../common/VoiceInput';
+import VoiceTextarea from '../common/VoiceTextarea';
 import type { ProjectMember, ProjectInvitation, ProjectRole } from '../../types';
 
 interface ProjectSettingsModalProps {
@@ -166,7 +168,7 @@ export default function ProjectSettingsModal({ onClose }: ProjectSettingsModalPr
             <>
               <div>
                 <label className="text-sm font-medium text-tx-secondary block mb-1">{t.projectName}</label>
-                <input
+                <VoiceInput
                   type="text"
                   value={name}
                   onChange={e => setName(e.target.value)}
@@ -180,7 +182,7 @@ export default function ProjectSettingsModal({ onClose }: ProjectSettingsModalPr
               </div>
               <div>
                 <label className="text-sm font-medium text-tx-secondary block mb-1">{t.projectDescription}</label>
-                <textarea
+                <VoiceTextarea
                   value={description}
                   onChange={e => setDescription(e.target.value)}
                   rows={2}
@@ -287,13 +289,14 @@ export default function ProjectSettingsModal({ onClose }: ProjectSettingsModalPr
               {/* Invite form */}
               {isAdmin && (
                 <form onSubmit={handleInvite} className="flex gap-2">
-                  <input
+                  <VoiceInput
                     type="email"
                     value={inviteEmail}
                     onChange={e => setInviteEmail(e.target.value)}
                     placeholder={t.projectInviteEmail}
                     className="flex-1 bg-subtle border border-th-border rounded-lg px-3 py-2 text-sm text-tx-primary placeholder-tx-faint focus:outline-none focus:border-amber-500/50"
                     required
+                    containerClassName="flex-1"
                   />
                   <select
                     value={inviteRole}

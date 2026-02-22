@@ -80,6 +80,11 @@ router.get('/pdf', exportLimiter, (req: Request, res: Response) => {
     .priority-high { color: #ea580c; }
     .priority-medium { color: #ca8a04; }
     .priority-low { color: #65a30d; }
+    @media print {
+      body { margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      table { page-break-inside: auto; }
+      tr { page-break-inside: avoid; }
+    }
   </style>
 </head>
 <body>

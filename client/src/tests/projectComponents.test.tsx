@@ -60,6 +60,8 @@ vi.mock('../hooks/useLanguage', () => ({
       setupOwner: 'Propriétaire',
       setupRepoName: 'Nom du repo',
       setupBranch: 'Branche',
+      setupSourceBranch: 'Branche source',
+      setupTargetBranch: 'Branche cible',
     },
     setLang: vi.fn(),
   }),
@@ -142,7 +144,7 @@ describe('CreateProjectModal', () => {
     expect(screen.getByText('Token')).toBeInTheDocument();
     expect(screen.getByText('Propriétaire')).toBeInTheDocument();
     expect(screen.getByText('Nom du repo')).toBeInTheDocument();
-    expect(screen.getByText('Branche')).toBeInTheDocument();
+    expect(screen.getByText('Branche source')).toBeInTheDocument();
 
     // Project fields
     expect(screen.getByText(/Nom du projet/)).toBeInTheDocument();
@@ -233,7 +235,8 @@ describe('CreateProjectModal', () => {
         owner: 'my-org',
         repo: 'my-repo',
         token: 'ghp_test123',
-        branch: 'main',
+        branch: 'master',
+        target_branch: 'develop',
       });
       expect(onClose).toHaveBeenCalled();
     });

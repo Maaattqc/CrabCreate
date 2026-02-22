@@ -12,6 +12,7 @@ describe('New feature i18n keys', () => {
     'labels', 'labelCreate', 'labelEdit', 'labelDelete', 'labelColor', 'labelName', 'labelNone',
     // Subtasks
     'subtasks', 'subtaskAdd', 'subtaskPlaceholder', 'subtaskProgress', 'subtaskEmpty',
+    'subtaskAiBadge', 'subtaskCoding', 'subtaskDecomposed',
     // Favorites
     'favorites', 'favoriteAdd', 'favoriteRemove', 'favoritesEmpty',
     // Templates
@@ -32,6 +33,8 @@ describe('New feature i18n keys', () => {
     'viewCalendar', 'viewTimeline', 'viewBoard', 'viewList',
     // Email
     'emailNotifications', 'emailMention', 'emailStatusChange',
+    // Voice input
+    'micStart', 'micStop', 'micNotSupported', 'micErrorNoSpeech', 'micErrorNotAllowed', 'micErrorGeneric', 'micListening',
   ];
 
   it('all new keys exist in FR translations', () => {

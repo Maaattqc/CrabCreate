@@ -64,9 +64,15 @@ export const rollbackTicket = (id: number): Promise<Ticket> => projectRequest<Ti
 
 // Logs, chat, activity, diff (project-scoped)
 export const getTicketLogs = (id: number): Promise<LogEntry[]> => projectRequest<LogEntry[]>(`${API}/tickets/${id}/logs`);
-export const getTicketChat = (id: number): Promise<ChatMessage[]> => projectRequest<ChatMessage[]>(`${API}/chat/${id}`);
-export const sendChatMessage = (id: number, message: string): Promise<ChatMessage> => projectRequest<ChatMessage>(`${API}/chat/${id}`, {
+export const getTicketChat = (id: number): Promise<{ messages: ChatMessage[]; hasPendingModification: boolean }> => projectRequest<{ messages: ChatMessage[]; hasPendingModification: boolean }>(`${API}/chat/${id}`);
+export const sendChatMessage = (id: number, message: string): Promise<{ success: boolean }> => projectRequest<{ success: boolean }>(`${API}/chat/${id}`, {
   method: 'POST', body: JSON.stringify({ message }),
+});
+export const applyChatModification = (id: number): Promise<{ success: boolean }> => projectRequest<{ success: boolean }>(`${API}/chat/${id}/apply`, {
+  method: 'POST',
+});
+export const modifyChatCode = (id: number, message: string, images?: { data: string; mediaType: string }[]): Promise<{ success: boolean }> => projectRequest<{ success: boolean }>(`${API}/chat/${id}/modify`, {
+  method: 'POST', body: JSON.stringify({ message, ...(images?.length ? { images } : {}) }),
 });
 export const getTicketActivity = (id: number): Promise<ActivityItem[]> => projectRequest<ActivityItem[]>(`${API}/tickets/${id}/activity`);
 export const getTicketDiff = (id: number): Promise<string> => projectRequest<string>(`${API}/tickets/${id}/diff`);
@@ -102,3 +108,27 @@ export const submitFeedback = (rating: number): Promise<{ ok: boolean }> =>
 // File locks (project-scoped) & repos
 export const getFileLocks = (): Promise<FileLock[]> => projectRequest<FileLock[]>(`${API}/file-locks`);
 export const getRepos = (): Promise<string[]> => projectRequest<string[]>(`${API}/repos`);
+
+// Screenshot
+export const fetchScreenshot = (url: string): Promise<{ data: string; mediaType: string }> =>
+  request<{ data: string; mediaType: string }>(`${API}/screenshot?url=${encodeURIComponent(url)}`);
+
+// Element Picker
+export interface ElementBox {
+  tag: string;
+  selector: string;
+  text: string;
+  classes: string;
+  rect: { x: number; y: number; width: number; height: number };
+}
+
+export interface ElementPickerResponse {
+  data: string;
+  mediaType: string;
+  elements: ElementBox[];
+  pageWidth: number;
+  pageHeight: number;
+}
+
+export const fetchElementPicker = (url: string): Promise<ElementPickerResponse> =>
+  request<ElementPickerResponse>(`${API}/screenshot/elements?url=${encodeURIComponent(url)}`);

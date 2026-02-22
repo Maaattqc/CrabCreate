@@ -70,6 +70,8 @@ export interface Translations {
   // Chat tab
   chatEmpty: string;
   chatPlaceholder: string;
+  chatApply: string;
+  chatApplying: string;
 
   // Terminal tab
   noLogs: string;
@@ -179,6 +181,8 @@ export interface Translations {
   // Notifications
   pipelineLaunched: string;
   error: string;
+  socketReconnected: string;
+  socketDisconnected: string;
 
   // Public navbar
   navHome: string;
@@ -623,6 +627,9 @@ export interface Translations {
   subtaskPlaceholder: string;
   subtaskProgress: string;
   subtaskEmpty: string;
+  subtaskAiBadge: string;
+  subtaskCoding: string;
+  subtaskDecomposed: string;
 
   // Favorites
   favorites: string;
@@ -747,11 +754,39 @@ export interface Translations {
   compareBefore: string;
   compareAfter: string;
   compareTitle: string;
+  compareOpenFullSite: string;
   compareNoProductionUrl: string;
   compareNoPreviewUrl: string;
   compareLoadingPreview: string;
   archivedOn: string;
   viewChanges: string;
+
+  // Review modify overlay
+  continueModifying: string;
+  whatChange: string;
+  confirmChanges: string;
+  addImages: string;
+  imageLimitReached: string;
+  dropOrPasteImages: string;
+  captureScreenshot: string;
+  captureBefore: string;
+  captureAfter: string;
+  selectCropArea: string;
+  selectPanelToCapture: string;
+  capturing: string;
+  elementPickerBtn: string;
+  elementPickerTitle: string;
+  elementPickerLoading: string;
+  elementPickerHint: string;
+
+  // Voice input (Speech-to-Text)
+  micStart: string;
+  micStop: string;
+  micNotSupported: string;
+  micErrorNoSpeech: string;
+  micErrorNotAllowed: string;
+  micErrorGeneric: string;
+  micListening: string;
 }
 
 export const translations: Record<Lang, Translations> = {
@@ -815,6 +850,8 @@ export const translations: Record<Lang, Translations> = {
 
     chatEmpty: 'Envoyez un message pour discuter avec l\'IA sur ce ticket.',
     chatPlaceholder: 'Envoyer une correction...',
+    chatApply: 'Appliquer les modifications',
+    chatApplying: 'Application en cours...',
 
     noLogs: 'Aucun log. Lancez le pipeline pour voir les logs en temps réel.',
     loadingDiff: 'Chargement du diff...',
@@ -910,6 +947,8 @@ export const translations: Record<Lang, Translations> = {
 
     pipelineLaunched: 'Pipeline lancé pour',
     error: 'Erreur',
+    socketReconnected: 'Connexion rétablie — données actualisées',
+    socketDisconnected: 'Connexion au serveur perdue...',
 
     navHome: 'Accueil',
     navPricing: 'Tarifs',
@@ -1320,6 +1359,9 @@ export const translations: Record<Lang, Translations> = {
     subtaskPlaceholder: 'Nouvelle sous-tâche...',
     subtaskProgress: '{done}/{total} terminées',
     subtaskEmpty: 'Aucune sous-tâche.',
+    subtaskAiBadge: 'IA',
+    subtaskCoding: 'Codage en cours...',
+    subtaskDecomposed: 'Décomposé en {count} sous-tâches',
 
     favorites: 'Favoris',
     favoriteAdd: 'Ajouter aux favoris',
@@ -1430,11 +1472,37 @@ export const translations: Record<Lang, Translations> = {
     compareBefore: 'Avant (Production)',
     compareAfter: 'Après (Preview)',
     compareTitle: 'Comparaison avant / après',
+    compareOpenFullSite: 'Ouvrir le site complet',
     compareNoProductionUrl: 'URL de production non configurée',
     compareNoPreviewUrl: 'URL de preview non disponible',
     compareLoadingPreview: 'Chargement du preview...',
     archivedOn: 'Archivé le',
     viewChanges: 'Voir changements',
+    continueModifying: 'Continuer à modifier',
+    whatChange: 'Quel changement voulez-vous ?',
+    confirmChanges: 'Confirmer les changements',
+    addImages: 'Ajouter des images',
+    imageLimitReached: '4 images maximum',
+    dropOrPasteImages: 'Glissez ou collez des images (max 4)',
+    captureScreenshot: 'Capturer',
+    captureBefore: 'Capturer Avant',
+    captureAfter: 'Capturer Après',
+    selectCropArea: 'Dessinez un rectangle sur la zone à capturer',
+    selectPanelToCapture: 'Cliquez sur le site à capturer',
+    capturing: 'Capture en cours...',
+    elementPickerBtn: 'Sélectionner un élément',
+    elementPickerTitle: 'Cliquez sur un élément à modifier',
+    elementPickerLoading: 'Chargement des éléments...',
+    elementPickerHint: 'Survolez pour voir les éléments, cliquez pour sélectionner',
+
+    // Voice input
+    micStart: 'Dictee vocale',
+    micStop: 'Arreter la dictee',
+    micNotSupported: 'Dictee vocale non supportee par ce navigateur',
+    micErrorNoSpeech: 'Aucune voix detectee',
+    micErrorNotAllowed: 'Acces au microphone refuse',
+    micErrorGeneric: 'Erreur de reconnaissance vocale',
+    micListening: 'Ecoute en cours...',
   },
   en: {
     credit: 'Credit',
@@ -1496,6 +1564,8 @@ export const translations: Record<Lang, Translations> = {
 
     chatEmpty: 'Send a message to chat with the AI about this ticket.',
     chatPlaceholder: 'Send a message...',
+    chatApply: 'Apply modifications',
+    chatApplying: 'Applying...',
 
     noLogs: 'No logs. Launch the pipeline to see real-time logs.',
     loadingDiff: 'Loading diff...',
@@ -1591,6 +1661,8 @@ export const translations: Record<Lang, Translations> = {
 
     pipelineLaunched: 'Pipeline launched for',
     error: 'Error',
+    socketReconnected: 'Connection restored — data refreshed',
+    socketDisconnected: 'Server connection lost...',
 
     navHome: 'Home',
     navPricing: 'Pricing',
@@ -2001,6 +2073,9 @@ export const translations: Record<Lang, Translations> = {
     subtaskPlaceholder: 'New subtask...',
     subtaskProgress: '{done}/{total} completed',
     subtaskEmpty: 'No subtasks.',
+    subtaskAiBadge: 'AI',
+    subtaskCoding: 'Coding...',
+    subtaskDecomposed: 'Decomposed into {count} subtasks',
 
     favorites: 'Favorites',
     favoriteAdd: 'Add to favorites',
@@ -2111,10 +2186,36 @@ export const translations: Record<Lang, Translations> = {
     compareBefore: 'Before (Production)',
     compareAfter: 'After (Preview)',
     compareTitle: 'Before / After Comparison',
+    compareOpenFullSite: 'Open full site',
     compareNoProductionUrl: 'Production URL not configured',
     compareNoPreviewUrl: 'Preview URL not available',
     compareLoadingPreview: 'Loading preview...',
     archivedOn: 'Archived on',
     viewChanges: 'View changes',
+    continueModifying: 'Continue modifying',
+    whatChange: 'What change do you want?',
+    confirmChanges: 'Confirm changes',
+    addImages: 'Add images',
+    imageLimitReached: '4 images maximum',
+    dropOrPasteImages: 'Drop or paste images (max 4)',
+    captureScreenshot: 'Capture',
+    captureBefore: 'Capture Before',
+    captureAfter: 'Capture After',
+    selectCropArea: 'Draw a rectangle on the area to capture',
+    selectPanelToCapture: 'Click on the site to capture',
+    capturing: 'Capturing...',
+    elementPickerBtn: 'Select element',
+    elementPickerTitle: 'Click on an element to modify',
+    elementPickerLoading: 'Loading elements...',
+    elementPickerHint: 'Hover to see elements, click to select',
+
+    // Voice input
+    micStart: 'Voice input',
+    micStop: 'Stop voice input',
+    micNotSupported: 'Voice input not supported',
+    micErrorNoSpeech: 'No speech detected',
+    micErrorNotAllowed: 'Microphone access denied',
+    micErrorGeneric: 'Speech recognition error',
+    micListening: 'Listening...',
   },
 };

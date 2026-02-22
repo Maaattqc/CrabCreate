@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Search, Hash, MessageSquare, Activity, X } from 'lucide-react';
 import { useLanguage } from '../../hooks/useLanguage';
 import { globalSearch } from '../../api/search';
+import VoiceInput from '../common/VoiceInput';
 import type { SearchResult } from '../../types';
 
 interface GlobalSearchProps {
@@ -137,12 +138,13 @@ export default function GlobalSearch({ onClose, onTicketSelect }: GlobalSearchPr
         {/* Input */}
         <div className="flex items-center gap-3 px-4 py-3 border-b border-th-border">
           <Search size={16} className="text-tx-faint shrink-0" />
-          <input
+          <VoiceInput
             ref={inputRef}
             value={query}
             onChange={e => setQuery(e.target.value)}
             placeholder={t.globalSearch}
             className="flex-1 bg-transparent text-sm text-tx-primary placeholder-tx-ghost focus:outline-none"
+            containerClassName="flex-1"
           />
           {query && (
             <button onClick={() => setQuery('')} className="text-tx-ghost hover:text-tx-faint">

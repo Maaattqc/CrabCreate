@@ -15,6 +15,9 @@ const socket: Socket = io(window.location.origin, {
 
 export function useSocket() {
   const [connected, setConnected] = useState(socket.connected);
+  const [wasReconnected, setWasReconnected] = useState(false);
+  // Track whether we've had a connection before (to distinguish initial connect from reconnect)
+  const hadConnectionRef = useRef(false);
   // Track listeners registered by THIS caller so cleanup only removes its own
   const listenersRef = useRef<Record<string, SocketCallback>>({});
 
@@ -24,13 +27,23 @@ export function useSocket() {
       socket.connect();
     }
 
-    const onConnect = () => setConnected(true);
+    const onConnect = () => {
+      setConnected(true);
+      if (hadConnectionRef.current) {
+        // This is a reconnection (not the first connect)
+        setWasReconnected(true);
+      }
+      hadConnectionRef.current = true;
+    };
     const onDisconnect = () => setConnected(false);
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
 
     // Sync initial state (another useSocket call may have connected already)
-    if (socket.connected) setConnected(true);
+    if (socket.connected) {
+      setConnected(true);
+      hadConnectionRef.current = true;
+    }
 
     return () => {
       socket.off('connect', onConnect);
@@ -42,6 +55,8 @@ export function useSocket() {
       listenersRef.current = {};
     };
   }, []);
+
+  const clearReconnected = useCallback(() => setWasReconnected(false), []);
 
   const on = useCallback((event: string, callback: SocketCallback): void => {
     // Remove previous listener for this event (from this caller only)
@@ -63,7 +78,7 @@ export function useSocket() {
     socket.emit(event, ...args);
   }, []);
 
-  return { connected, on, off, emit, socket };
+  return { connected, wasReconnected, clearReconnected, on, off, emit, socket };
 }
 
 /** Force-disconnect the shared socket (call on logout). */

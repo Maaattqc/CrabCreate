@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { Search, Hash, ArrowRight } from 'lucide-react';
 import { useLanguage } from '../../hooks/useLanguage';
 import { getColumnLabel } from '../../constants';
+import VoiceInput from '../common/VoiceInput';
 import type { Ticket } from '../../types';
 
 interface CommandPaletteProps {
@@ -56,12 +57,13 @@ export default function CommandPalette({ tickets, onSelect, onClose, onCreate }:
         {/* Input */}
         <div className="flex items-center gap-3 px-4 py-3 border-b border-th-border">
           <Search size={16} className="text-tx-faint shrink-0" />
-          <input
+          <VoiceInput
             ref={inputRef}
             value={query}
             onChange={e => setQuery(e.target.value)}
             placeholder={t.cmdPlaceholder}
             className="flex-1 bg-transparent text-sm text-tx-primary placeholder-tx-ghost focus:outline-none"
+            containerClassName="flex-1"
           />
           <kbd className="text-[10px] text-tx-ghost bg-subtle px-1.5 py-0.5 rounded font-mono">ESC</kbd>
         </div>

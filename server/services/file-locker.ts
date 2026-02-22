@@ -58,4 +58,35 @@ function getAll(): FileLock[] {
   `).all() as FileLock[];
 }
 
-export { checkAndLock, unlock, getAll };
+/**
+ * Read-only check: are target files free? Does NOT acquire locks.
+ */
+function check(ticket: Ticket): FileCheckResult {
+  let targetFiles: string[] = [];
+  try {
+    targetFiles = JSON.parse(ticket.target_files || '[]');
+  } catch {
+    targetFiles = [];
+  }
+
+  if (targetFiles.length === 0) {
+    return { ok: true };
+  }
+
+  for (const filePath of targetFiles) {
+    const lock = db.prepare(
+      'SELECT * FROM kanban_file_locks WHERE file_path = ? AND ticket_id != ?'
+    ).get(filePath, ticket.id) as FileLock | undefined;
+
+    if (lock) {
+      return {
+        ok: false,
+        message: `Fichier "${filePath}" bloqué par le ticket #${lock.ticket_id}`,
+      };
+    }
+  }
+
+  return { ok: true };
+}
+
+export { checkAndLock, check, unlock, getAll };

@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { X } from 'lucide-react';
 import { AI_MODELS } from '../../constants';
 import { useLanguage } from '../../hooks/useLanguage';
+import VoiceInput from '../common/VoiceInput';
+import VoiceTextarea from '../common/VoiceTextarea';
 import type { Ticket } from '../../types';
 
 
@@ -27,7 +29,7 @@ export default function CreateTicketModal({ onClose, onCreate }: CreateTicketMod
     description: '',
     priority: 'medium',
     template: 'feature',
-    ai_model: 'claude',
+    ai_model: 'gpt',
     repo: 'main-site',
     assignee: 'unassigned',
   });
@@ -73,7 +75,7 @@ export default function CreateTicketModal({ onClose, onCreate }: CreateTicketMod
           {/* Title */}
           <div>
             <label className="block text-xs text-tx-muted mb-1">{t.titleLabel}</label>
-            <input
+            <VoiceInput
               value={form.title}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => setForm(f => ({ ...f, title: e.target.value }))}
               className={`w-full bg-subtle border rounded-lg px-3 py-2 text-sm text-tx-secondary focus:outline-none focus:border-amber-500/50 ${form.title.length > 0 && form.title.length < 3 ? 'border-red-500/50' : 'border-th-border-strong'}`}
@@ -96,7 +98,7 @@ export default function CreateTicketModal({ onClose, onCreate }: CreateTicketMod
           {/* Description */}
           <div>
             <label className="block text-xs text-tx-muted mb-1">{t.descriptionLabel}</label>
-            <textarea
+            <VoiceTextarea
               value={form.description}
               onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setForm(f => ({ ...f, description: e.target.value }))}
               className="w-full bg-subtle border border-th-border-strong rounded-lg px-3 py-2 text-sm text-tx-secondary focus:outline-none focus:border-amber-500/50 min-h-[80px] resize-y"

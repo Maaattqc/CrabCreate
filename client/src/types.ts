@@ -21,7 +21,9 @@ export interface Ticket {
   depends_on: string;
   complexity: string;
   pipeline_step: number;
+  pipeline_started_at: string | null;
   position: number;
+  column_position: number;
   due_date: string | null;
   archived_at: string | null;
   branch_name: string;
@@ -271,8 +273,10 @@ export interface Subtask {
   id: number;
   ticket_id: number;
   title: string;
+  description: string;
   completed: number;
   position: number;
+  ai_generated: number;
   created_at: string;
 }
 

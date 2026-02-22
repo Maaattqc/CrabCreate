@@ -341,13 +341,7 @@ export default function Header({ search, onSearchChange, viewMode, onViewModeCha
           >
             <Calendar size={16} />
           </button>
-          <button
-            onClick={() => onViewModeChange('timeline')}
-            className={`p-2 rounded-md transition-colors ${viewMode === 'timeline' ? 'bg-subtle-hover text-tx-primary' : 'text-tx-faint hover:text-tx-tertiary'}`}
-            title={t.viewTimeline}
-          >
-            <Clock size={16} />
-          </button>
+          {/* Timeline button hidden – view code kept */}
         </div>
       )}
 

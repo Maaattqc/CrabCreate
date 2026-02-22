@@ -28,7 +28,7 @@ describe('connectRepoSchema', () => {
     });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.branch).toBe('main');
+      expect(result.data.branch).toBe('master');
     }
   });
 

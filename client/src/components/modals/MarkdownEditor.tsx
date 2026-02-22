@@ -5,6 +5,8 @@ import remarkGfm from 'remark-gfm';
 import type { Components } from 'react-markdown';
 import { useMarkdown } from '../../hooks/useMarkdown';
 import { useLanguage } from '../../hooks/useLanguage';
+import { useSpeechToText } from '../../hooks/useSpeechToText';
+import MicButton from '../common/MicButton';
 
 interface MarkdownEditorProps {
   value: string;
@@ -49,6 +51,16 @@ export default function MarkdownEditor({ value, onChange, placeholder, maxLength
   const { t } = useLanguage();
   const { isPreview, togglePreview } = useMarkdown();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const handleTranscript = useCallback((text: string, isFinal: boolean) => {
+    if (isFinal) onChange(value ? `${value} ${text}` : text);
+  }, [onChange, value]);
+  const { isListening, isSupported, toggle: toggleMic } = useSpeechToText({ onTranscript: handleTranscript });
+
+  const handleMicClick = useCallback(() => {
+    textareaRef.current?.focus();
+    toggleMic();
+  }, [toggleMic]);
 
   const wrapSelection = useCallback((before: string, after: string) => {
     const textarea = textareaRef.current;
@@ -131,6 +143,7 @@ export default function MarkdownEditor({ value, onChange, placeholder, maxLength
               <Icon size={14} />
             </button>
           ))}
+          <MicButton isListening={isListening} isSupported={isSupported} onClick={handleMicClick} size={14} />
         </div>
 
         <div className="flex items-center gap-1">

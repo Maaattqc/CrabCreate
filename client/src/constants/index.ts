@@ -31,8 +31,8 @@ export const TEMPLATES: Template[] = [
 ];
 
 export const AI_MODELS: AIModel[] = [
-  { id: 'claude', label: 'Claude Opus 4.6' },
   { id: 'gpt', label: 'GPT-5.3' },
+  { id: 'claude', label: 'Claude Opus 4.6' },
 ];
 
 const COLUMN_LABEL_KEYS: Record<string, string> = {

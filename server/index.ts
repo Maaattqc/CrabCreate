@@ -9,7 +9,7 @@ import config from './config';
 import { migrate } from './db/migrations';
 import db from './db/sqlite';
 import { initSocket } from './socket';
-import { startQueue, stopQueue } from './services/queue';
+import { startQueue, stopQueue, recoverStuckTickets, isQueueRunning } from './services/queue';
 import logger from './services/logger';
 import * as repo from './db/repositories';
 
@@ -37,6 +37,7 @@ import userWebhooksRouter from './routes/user-webhooks';
 import searchRouter from './routes/search';
 import exportRouter from './routes/export';
 import projectSetupRouter from './routes/project-setup';
+import screenshotRouter from './routes/screenshot';
 import { stripeWebhookHandler, stripeWebhookLimiter } from './routes/stripe-webhook';
 import { apiLimiter } from './middleware/rate-limit';
 import { requireAuth } from './middleware/auth';
@@ -242,7 +243,15 @@ app.get('/health', (_req: Request, res: Response) => {
   try {
     // Quick DB check
     db.prepare('SELECT 1').get();
-    res.json({ status: 'ok' });
+    const activePipelines = repo.countActivePipelines();
+    const fileLocks = (db.prepare('SELECT COUNT(*) as count FROM kanban_file_locks').get() as { count: number }).count;
+    res.json({
+      status: 'ok',
+      activePipelines,
+      fileLocks,
+      queueRunning: isQueueRunning(),
+      uptime: Math.floor(process.uptime()),
+    });
   } catch {
     res.status(503).json({ status: 'error', message: 'Database unavailable' });
   }
@@ -317,6 +326,7 @@ app.use('/api/prompts', promptsRouter);
 app.use('/api/settings', settingsRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/billing', billingRouter);
+app.use('/api/screenshot', screenshotRouter);
 
 // File locks endpoint (project-scoped)
 app.get('/api/file-locks', requireProject, (req: Request, res: Response) => {
@@ -354,7 +364,8 @@ if (config.nodeEnv === 'production') {
   });
 }
 
-// Start queue polling
+// Recover stuck tickets from previous crash, then start queue polling
+recoverStuckTickets();
 startQueue();
 
 server.listen(config.port, config.host, () => {
@@ -373,6 +384,17 @@ function shutdown(signal: string): void {
     // Stop queue polling
     stopQueue();
     logger.info('Queue stopped');
+
+    // Clean remaining file locks (prevent orphans across restarts)
+    try {
+      const lockCount = (db.prepare('SELECT COUNT(*) as count FROM kanban_file_locks').get() as { count: number }).count;
+      if (lockCount > 0) {
+        db.prepare('DELETE FROM kanban_file_locks').run();
+        logger.info(`Cleaned ${lockCount} file lock(s) on shutdown`);
+      }
+    } catch {
+      // DB may already be closing
+    }
 
     // Close SQLite connection
     try {

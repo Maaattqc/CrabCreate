@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Plus, Trash2, CheckSquare, Square, Loader2 } from 'lucide-react';
+import { Plus, Trash2, CheckSquare, Square, Loader2, Bot } from 'lucide-react';
 import { useLanguage } from '../../hooks/useLanguage';
 import { useSubtasks } from '../../hooks/useSubtasks';
+import VoiceInput from '../common/VoiceInput';
 
 interface SubtasksTabProps {
   ticketId: number;
@@ -9,7 +10,7 @@ interface SubtasksTabProps {
 
 export default function SubtasksTab({ ticketId }: SubtasksTabProps) {
   const { t } = useLanguage();
-  const { subtasks, loading, fetch, create, toggle, remove, completed, total, progress } = useSubtasks(ticketId);
+  const { subtasks, loading, fetch, create, toggle, remove, completed, total, progress, codingSubtaskId } = useSubtasks(ticketId);
   const [newTitle, setNewTitle] = useState('');
   const [adding, setAdding] = useState(false);
 
@@ -70,50 +71,78 @@ export default function SubtasksTab({ ticketId }: SubtasksTabProps) {
 
       {!loading && (
         <div className="space-y-0.5 mb-4">
-          {subtasks.map(subtask => (
-            <div
-              key={subtask.id}
-              className="group flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-subtle-hover transition-colors"
-            >
-              <button
-                onClick={() => toggle(subtask.id)}
-                className="shrink-0 text-tx-faint hover:text-amber-400 transition-colors"
-              >
-                {subtask.completed ? (
-                  <CheckSquare size={16} className="text-green-400" />
-                ) : (
-                  <Square size={16} />
-                )}
-              </button>
-              <span
-                className={`flex-1 text-sm transition-colors ${
-                  subtask.completed
-                    ? 'text-tx-faint line-through'
-                    : 'text-tx-secondary'
+          {subtasks.map(subtask => {
+            const isCoding = codingSubtaskId === subtask.id;
+            return (
+              <div
+                key={subtask.id}
+                className={`group flex items-start gap-2.5 px-3 py-2 rounded-lg transition-colors ${
+                  isCoding ? 'bg-amber-500/10 ring-1 ring-amber-500/20' : 'hover:bg-subtle-hover'
                 }`}
               >
-                {subtask.title}
-              </span>
-              <button
-                onClick={() => remove(subtask.id)}
-                className="shrink-0 p-1 rounded text-tx-faint opacity-0 group-hover:opacity-100 hover:text-red-400 transition-all"
-              >
-                <Trash2 size={13} />
-              </button>
-            </div>
-          ))}
+                <button
+                  onClick={() => toggle(subtask.id)}
+                  className="shrink-0 mt-0.5 text-tx-faint hover:text-amber-400 transition-colors"
+                >
+                  {isCoding ? (
+                    <Loader2 size={16} className="animate-spin text-amber-400" />
+                  ) : subtask.completed ? (
+                    <CheckSquare size={16} className="text-green-400" />
+                  ) : (
+                    <Square size={16} />
+                  )}
+                </button>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`text-sm transition-colors ${
+                        subtask.completed
+                          ? 'text-tx-faint line-through'
+                          : 'text-tx-secondary'
+                      }`}
+                    >
+                      {subtask.title}
+                    </span>
+                    {subtask.ai_generated === 1 && (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-semibold rounded bg-amber-500/15 text-amber-400">
+                        <Bot size={10} />
+                        {t.subtaskAiBadge}
+                      </span>
+                    )}
+                    {isCoding && (
+                      <span className="text-[10px] text-amber-400 font-medium animate-pulse">
+                        {t.subtaskCoding}
+                      </span>
+                    )}
+                  </div>
+                  {subtask.description && (
+                    <p className="text-xs text-tx-faint mt-0.5 leading-relaxed">
+                      {subtask.description}
+                    </p>
+                  )}
+                </div>
+                <button
+                  onClick={() => remove(subtask.id)}
+                  className="shrink-0 p-1 rounded text-tx-faint opacity-0 group-hover:opacity-100 hover:text-red-400 transition-all"
+                >
+                  <Trash2 size={13} />
+                </button>
+              </div>
+            );
+          })}
         </div>
       )}
 
       {/* Add new subtask */}
       <div className="flex items-center gap-2 pt-2 border-t border-th-border">
-        <input
+        <VoiceInput
           value={newTitle}
           onChange={e => setNewTitle(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') handleAdd(); }}
           className="flex-1 bg-subtle border border-th-border-strong rounded-lg px-3 py-2 text-sm text-tx-secondary focus:outline-none focus:border-amber-500/50 placeholder-tx-ghost"
           placeholder={t.subtaskPlaceholder}
           maxLength={200}
+          containerClassName="flex-1"
         />
         <button
           onClick={handleAdd}

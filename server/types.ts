@@ -30,7 +30,9 @@ export interface Ticket {
   test_results: string | null;
   progress: number;
   pipeline_step: number;
+  pipeline_started_at: string | null;
   position: number;
+  column_position: number;
   user_id: number | null;
   project_id: number | null;
   last_modified_by: number | null;
@@ -174,6 +176,7 @@ export interface CodingResult {
   branchName: string;
   repoDir: string;
   previewPath: string;
+  modificationPrompt?: string;
 }
 
 export interface ReviewIssue {
@@ -391,8 +394,10 @@ export interface Subtask {
   id: number;
   ticket_id: number;
   title: string;
+  description: string;
   completed: number;
   position: number;
+  ai_generated: number;
   created_at: string;
 }
 

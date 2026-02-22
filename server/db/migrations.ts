@@ -557,6 +557,31 @@ function migrate(): void {
     }
   }
 
+  // ── column_position: stable ordering inside pipeline columns ──
+  if (ticketCols.length > 0 && !ticketColNames.includes('column_position')) {
+    db.exec("ALTER TABLE kanban_tickets ADD COLUMN column_position INTEGER DEFAULT 0");
+    // Backfill: give existing non-backlog tickets a reasonable initial order (by id)
+    db.exec("UPDATE kanban_tickets SET column_position = id WHERE status != 'backlog'");
+  }
+
+  // ── pipeline_started_at: track when pipeline started (for crash recovery) ──
+  if (ticketCols.length > 0 && !ticketColNames.includes('pipeline_started_at')) {
+    db.exec("ALTER TABLE kanban_tickets ADD COLUMN pipeline_started_at TEXT");
+    // Backfill: tickets currently in pipeline get their updated_at as start time
+    db.exec(`UPDATE kanban_tickets SET pipeline_started_at = updated_at
+      WHERE status IN ('estimating', 'ai_coding', 'ai_review', 'testing', 'deploying')`);
+  }
+
+  // ── Subtask decomposition columns ──
+  const subtaskCols = db.prepare("PRAGMA table_info(kanban_subtasks)").all() as { name: string }[];
+  const subtaskColNames = subtaskCols.map(c => c.name);
+  if (subtaskCols.length > 0 && !subtaskColNames.includes('description')) {
+    db.exec("ALTER TABLE kanban_subtasks ADD COLUMN description TEXT DEFAULT ''");
+  }
+  if (subtaskCols.length > 0 && !subtaskColNames.includes('ai_generated')) {
+    db.exec("ALTER TABLE kanban_subtasks ADD COLUMN ai_generated INTEGER DEFAULT 0");
+  }
+
   // [TEST] Skip AI coding in pipeline — set to '0' or remove to re-enable
   db.prepare("INSERT INTO kanban_config (config_key, config_value) VALUES ('skip_coding', '1') ON CONFLICT(config_key) DO NOTHING").run();
 

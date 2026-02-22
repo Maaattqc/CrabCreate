@@ -3,6 +3,8 @@ import { X, Plus, Pencil, Trash2, Play, FileText, Loader2 } from 'lucide-react';
 import { useLanguage } from '../../hooks/useLanguage';
 import { useTemplates } from '../../hooks/useTemplates';
 import { PRIORITIES, TEMPLATES } from '../../constants';
+import VoiceInput from '../common/VoiceInput';
+import VoiceTextarea from '../common/VoiceTextarea';
 import type { TicketTemplate } from '../../types';
 
 interface TemplateManagerProps {
@@ -190,7 +192,7 @@ export default function TemplateManager({ onClose, onApplyTemplate }: TemplateMa
             {/* Name */}
             <div>
               <label className="block text-xs text-tx-muted mb-1">{t.templateName}</label>
-              <input
+              <VoiceInput
                 value={form.name}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setForm(f => ({ ...f, name: e.target.value }))}
                 className="w-full bg-subtle border border-th-border-strong rounded-lg px-3 py-2 text-sm text-tx-secondary focus:outline-none focus:border-amber-500/50"
@@ -201,7 +203,7 @@ export default function TemplateManager({ onClose, onApplyTemplate }: TemplateMa
             {/* Title template */}
             <div>
               <label className="block text-xs text-tx-muted mb-1">{t.titleLabel}</label>
-              <input
+              <VoiceInput
                 value={form.title_template}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setForm(f => ({ ...f, title_template: e.target.value }))}
                 className="w-full bg-subtle border border-th-border-strong rounded-lg px-3 py-2 text-sm text-tx-secondary focus:outline-none focus:border-amber-500/50"
@@ -212,7 +214,7 @@ export default function TemplateManager({ onClose, onApplyTemplate }: TemplateMa
             {/* Description template */}
             <div>
               <label className="block text-xs text-tx-muted mb-1">{t.descriptionLabel}</label>
-              <textarea
+              <VoiceTextarea
                 value={form.description_template}
                 onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setForm(f => ({ ...f, description_template: e.target.value }))}
                 className="w-full bg-subtle border border-th-border-strong rounded-lg px-3 py-2 text-sm text-tx-secondary focus:outline-none focus:border-amber-500/50 h-20 resize-none"

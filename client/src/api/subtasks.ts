@@ -16,8 +16,10 @@ export function getSubtasks(ticketId: number): Promise<Subtask[]> {
   return request(`${API}/tickets/${ticketId}/subtasks`);
 }
 
-export function createSubtask(ticketId: number, title: string): Promise<Subtask> {
-  return request(`${API}/tickets/${ticketId}/subtasks`, { method: 'POST', body: JSON.stringify({ title }) });
+export function createSubtask(ticketId: number, title: string, description?: string): Promise<Subtask> {
+  const body: Record<string, string> = { title };
+  if (description) body.description = description;
+  return request(`${API}/tickets/${ticketId}/subtasks`, { method: 'POST', body: JSON.stringify(body) });
 }
 
 export function updateSubtask(ticketId: number, subtaskId: number, data: Partial<Subtask>): Promise<Subtask> {

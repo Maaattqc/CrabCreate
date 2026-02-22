@@ -495,9 +495,10 @@ function emitTicketLog(ticketId: number, message: string, logType: string = 'inf
 
 function emitTicketStatus(ticketId: number, status: string, progress: number = 0, projectId?: number): void {
   if (io) {
-    const payload = { ticketId, status, progress };
-    const resolvedProjectId = projectId ?? repo.findTicketById(ticketId)?.project_id;
+    const ticket = repo.findTicketById(ticketId);
+    const resolvedProjectId = projectId ?? ticket?.project_id;
     if (!resolvedProjectId) return;
+    const payload = { ticketId, status, progress, column_position: ticket?.column_position ?? 0 };
     io.to(`project:${resolvedProjectId}`).emit('ticket:status', payload);
   }
 }
@@ -525,6 +526,14 @@ function emitProjectUpdated(projectId: number, fields: Record<string, any>): voi
   }
 }
 
+function emitSubtaskProgress(ticketId: number, subtaskId: number, status: 'coding' | 'completed', projectId?: number): void {
+  if (io) {
+    const resolvedProjectId = projectId ?? repo.findTicketById(ticketId)?.project_id;
+    if (!resolvedProjectId) return;
+    io.to(`project:${resolvedProjectId}`).emit('subtask:progress', { ticketId, subtaskId, status });
+  }
+}
+
 /** Disconnect all sockets for a given user (used after block/token revocation). */
 function disconnectUser(userId: number): void {
   if (!io) return;
@@ -535,4 +544,4 @@ function disconnectUser(userId: number): void {
   }
 }
 
-export { initSocket, getIO, emitTicketLog, emitTicketStatus, emitTicketUpdated, emitNotification, emitProjectUpdated, disconnectUser };
+export { initSocket, getIO, emitTicketLog, emitTicketStatus, emitTicketUpdated, emitNotification, emitProjectUpdated, emitSubtaskProgress, disconnectUser };

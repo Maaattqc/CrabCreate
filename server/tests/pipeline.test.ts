@@ -52,6 +52,12 @@ const MIGRATION_SQL = `
     last_modified_by INTEGER,
     position INTEGER DEFAULT 0,
     due_date TEXT,
+    archived_at TEXT,
+    pipeline_step INTEGER DEFAULT 0,
+    column_position INTEGER DEFAULT 0,
+    pipeline_started_at TEXT,
+    creator_email TEXT,
+    modifier_email TEXT,
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now'))
   );
@@ -165,6 +171,27 @@ const MIGRATION_SQL = `
     expires_at TEXT NOT NULL,
     used INTEGER DEFAULT 0,
     attempts INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS kanban_status_transitions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ticket_id INTEGER NOT NULL REFERENCES kanban_tickets(id) ON DELETE CASCADE,
+    from_status TEXT,
+    to_status TEXT NOT NULL,
+    changed_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS kanban_deploy_configs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL UNIQUE REFERENCES kanban_projects(id) ON DELETE CASCADE,
+    cf_project_name TEXT,
+    cf_site_url TEXT,
+    cf_api_token TEXT,
+    cf_account_id TEXT,
+    supabase_tenant_id TEXT,
+    custom_domain TEXT,
+    production_manifest TEXT,
     created_at TEXT DEFAULT (datetime('now'))
   );
 `;
@@ -281,6 +308,7 @@ function setupDefaultMocks() {
   (fileLocker.checkAndLock as Mock).mockReturnValue({ ok: true });
   (fileLocker.unlock as Mock).mockReturnValue(undefined);
   (aiCoder.estimateComplexity as Mock).mockResolvedValue({ complexity: 'medium' });
+  (aiCoder.decomposeTicket as Mock).mockResolvedValue({ single: true, subtasks: [] });
   (aiCoder.generateCode as Mock).mockResolvedValue(MOCK_CODING_RESULT);
   (aiReviewer.review as Mock).mockResolvedValue(MOCK_REVIEW_RESULT);
   (testGenerator.runTests as Mock).mockResolvedValue(MOCK_TEST_RESULTS);
@@ -288,6 +316,8 @@ function setupDefaultMocks() {
   (deployer.mergeToProduction as Mock).mockResolvedValue(undefined);
   (deployer.closePR as Mock).mockResolvedValue(undefined);
   (deployer.rollback as Mock).mockResolvedValue(undefined);
+  (deployer.readTicketFiles as Mock).mockReturnValue({ codingFiles: [], baseFiles: [] });
+  (deployer.saveTicketFiles as Mock).mockReturnValue(undefined);
   (canLaunchPipeline as Mock).mockReturnValue(true);
   (canModifyTicket as Mock).mockReturnValue(true);
 }
@@ -521,16 +551,32 @@ describe('Pipeline E2E', () => {
 
   // 10. Retry
   describe('POST /api/pipeline/retry/:id', () => {
-    it('resets ticket to backlog', async () => {
+    it('resets ticket to backlog when no coding files exist', async () => {
       testDb.prepare("UPDATE kanban_tickets SET status = 'rejected' WHERE id = ?").run(ticketId);
 
       const res = await request(app).post(`/api/pipeline/retry/${ticketId}`);
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
+      expect(res.body.mode).toBe('backlog');
 
       const ticket = repo.findTicketById(ticketId);
       expect(ticket!.status).toBe('backlog');
       expect(fileLocker.unlock).toHaveBeenCalledWith(ticketId);
+    });
+
+    it('resumes pipeline when coding files exist (chat modification retry)', async () => {
+      testDb.prepare("UPDATE kanban_tickets SET status = 'rejected' WHERE id = ?").run(ticketId);
+
+      // Simulate stored coding files from a previous chat modification
+      (deployer.readTicketFiles as Mock).mockReturnValue({
+        codingFiles: [{ path: 'index.html', content: '<h1>Modified</h1>' }],
+        baseFiles: [{ path: 'index.html', content: '<h1>Original</h1>' }],
+      });
+
+      const res = await request(app).post(`/api/pipeline/retry/${ticketId}`);
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.mode).toBe('resume');
     });
   });
 

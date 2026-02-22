@@ -1,18 +1,22 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Send } from 'lucide-react';
 import { getTicketChat, sendChatMessage } from '../../api/tickets';
 import { useSocket } from '../../hooks/useSocket';
 import { useLanguage } from '../../hooks/useLanguage';
 import { useAIDesign } from '../../hooks/useAIDesign';
+import { useSpeechToText } from '../../hooks/useSpeechToText';
+import MicButton from '../common/MicButton';
 import type { ChatMessage } from '../../types';
 
 interface ChatTabProps {
   ticketId: number;
 }
 
-/* Typewriter hook: reveals text character by character */
-function useTypewriter(text: string, speed = 18): { display: string; done: boolean } {
+/* Typewriter hook: reveals text in chunks for a fast but visible effect */
+function useTypewriter(text: string, speed = 4): { display: string; done: boolean } {
   const [charIdx, setCharIdx] = useState(0);
+  // Reveal multiple chars per tick for longer messages
+  const chunkSize = Math.max(1, Math.ceil(text.length / 80));
 
   useEffect(() => {
     setCharIdx(0);
@@ -20,26 +24,32 @@ function useTypewriter(text: string, speed = 18): { display: string; done: boole
 
   useEffect(() => {
     if (charIdx >= text.length) return;
-    const timer = setTimeout(() => setCharIdx(i => i + 1), speed);
+    const timer = setTimeout(() => setCharIdx(i => Math.min(i + chunkSize, text.length)), speed);
     return () => clearTimeout(timer);
-  }, [charIdx, text, speed]);
+  }, [charIdx, text, speed, chunkSize]);
 
   return { display: text.slice(0, charIdx), done: charIdx >= text.length };
 }
 
-function AIMessageBubble({ msg, isLast, aiDesign }: { msg: ChatMessage; isLast: boolean; aiDesign: boolean }) {
+function AIMessageBubble({ msg, isLast, aiDesign }: {
+  msg: ChatMessage;
+  isLast: boolean;
+  aiDesign: boolean;
+}) {
   const { display, done } = useTypewriter(msg.message, aiDesign && isLast ? 18 : 0);
   const text = aiDesign && isLast ? display : msg.message;
 
   return (
     <div className="flex justify-start">
-      <div className="max-w-[80%] px-3 py-2 rounded-lg text-sm bg-subtle text-tx-tertiary">
-        <div className="whitespace-pre-wrap break-words">
-          {text}
-          {aiDesign && isLast && !done && <span className="ai-typewriter-cursor" />}
-        </div>
-        <div className="text-[10px] text-tx-ghost mt-1">
-          {new Date(msg.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+      <div className="max-w-[80%]">
+        <div className="px-3 py-2 rounded-lg text-sm bg-subtle text-tx-tertiary">
+          <div className="whitespace-pre-wrap break-words">
+            {text}
+            {aiDesign && isLast && !done && <span className="ai-typewriter-cursor" />}
+          </div>
+          <div className="text-[10px] text-tx-ghost mt-1">
+            {new Date(msg.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+          </div>
         </div>
       </div>
     </div>
@@ -53,17 +63,34 @@ export default function ChatTab({ ticketId }: ChatTabProps) {
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const { on, off } = useSocket();
 
+  const handleTranscript = useCallback((text: string, isFinal: boolean) => {
+    if (isFinal) setInput(prev => prev ? `${prev} ${text}` : text);
+  }, []);
+  const { isListening, isSupported, toggle: toggleMic } = useSpeechToText({ onTranscript: handleTranscript });
+
+    const handleMicClick = useCallback(() => {
+      inputRef.current?.focus();
+      toggleMic();
+    }, [toggleMic]);
+
+  const fetchChat = () => {
+    getTicketChat(ticketId).then(data => {
+      setMessages(data.messages);
+    }).catch(() => {});
+  };
+
   useEffect(() => {
-    getTicketChat(ticketId).then(setMessages).catch(() => {});
+    fetchChat();
   }, [ticketId]);
 
   // Refresh on socket update
   useEffect(() => {
     on('ticket:updated', (data: { ticketId: number; chatUpdate?: boolean }) => {
       if (data.ticketId === ticketId && data.chatUpdate) {
-        getTicketChat(ticketId).then(setMessages).catch(() => {});
+        fetchChat();
       }
     });
     return () => off('ticket:updated');
@@ -102,7 +129,14 @@ export default function ChatTab({ ticketId }: ChatTabProps) {
         )}
         {messages.map((msg, i) => {
           if (msg.role === 'ai') {
-            return <AIMessageBubble key={msg.id || i} msg={msg} isLast={i === lastAiIdx} aiDesign={aiDesign} />;
+            return (
+              <AIMessageBubble
+                key={msg.id || i}
+                msg={msg}
+                isLast={i === lastAiIdx}
+                aiDesign={aiDesign}
+              />
+            );
           }
           return (
             <div key={msg.id || i} className="flex justify-end">
@@ -122,6 +156,7 @@ export default function ChatTab({ ticketId }: ChatTabProps) {
       <div className="p-3 border-t border-th-border">
         <div className="flex gap-2">
           <input
+            ref={inputRef}
             value={input}
             onChange={(e: React.ChangeEvent<HTMLInputElement>) => setInput(e.target.value)}
             onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => e.key === 'Enter' && !e.shiftKey && handleSend()}
@@ -129,6 +164,7 @@ export default function ChatTab({ ticketId }: ChatTabProps) {
             className="flex-1 bg-subtle border border-th-border-strong rounded-lg px-3 py-2 text-sm text-tx-secondary focus:outline-none focus:border-amber-500/50"
             disabled={sending}
           />
+          <MicButton isListening={isListening} isSupported={isSupported} onClick={handleMicClick} size={14} />
           <button
             onClick={handleSend}
             disabled={!input.trim() || sending}

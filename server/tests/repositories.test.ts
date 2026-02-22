@@ -34,6 +34,12 @@ const MIGRATION_SQL = `
     last_modified_by INTEGER,
     position INTEGER DEFAULT 0,
     due_date TEXT,
+    archived_at TEXT,
+    pipeline_step INTEGER DEFAULT 0,
+    column_position INTEGER DEFAULT 0,
+    pipeline_started_at TEXT,
+    creator_email TEXT,
+    modifier_email TEXT,
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now'))
   );
@@ -117,6 +123,14 @@ const MIGRATION_SQL = `
     ip TEXT,
     created_at TEXT DEFAULT (datetime('now'))
   );
+
+  CREATE TABLE IF NOT EXISTS kanban_status_transitions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ticket_id INTEGER NOT NULL REFERENCES kanban_tickets(id) ON DELETE CASCADE,
+    from_status TEXT,
+    to_status TEXT NOT NULL,
+    changed_at TEXT DEFAULT (datetime('now'))
+  );
 `;
 
 // ── Create a fresh in-memory DB for each test ────────────────────────────────
@@ -186,7 +200,7 @@ describe('Ticket repository', () => {
       expect(ticket.description).toBe('A description');
       expect(ticket.priority).toBe('medium');
       expect(ticket.status).toBe('backlog');
-      expect(ticket.ai_model).toBe('claude');
+      expect(ticket.ai_model).toBe('gpt');
 
       const found = findTicketById(ticket.id);
       expect(found).toBeDefined();

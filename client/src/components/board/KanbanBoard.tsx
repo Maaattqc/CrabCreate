@@ -106,7 +106,13 @@ export default function KanbanBoard({ tickets, onTicketClick, onLaunch, onArchiv
       {/* Columns */}
       <div className="flex gap-0 flex-1 px-3 pb-3" data-onboard="columns">
         {COLUMNS.map((column, i) => {
-          const columnTickets = tickets.filter(t => t.status === column.id);
+          const columnTickets = tickets
+            .filter(t => t.status === column.id)
+            .sort((a, b) =>
+              column.id === 'backlog'
+                ? (a.position ?? 0) - (b.position ?? 0)
+                : (a.column_position ?? 0) - (b.column_position ?? 0)
+            );
           return (
             <div key={column.id} className="flex flex-1 min-w-[140px]">
               <Column

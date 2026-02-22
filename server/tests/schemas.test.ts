@@ -40,7 +40,7 @@ describe('createTicketSchema', () => {
     if (result.success) {
       expect(result.data.title).toBe('Minimal ticket');
       expect(result.data.priority).toBe('medium');
-      expect(result.data.ai_model).toBe('claude');
+      expect(result.data.ai_model).toBe('gpt');
       expect(result.data.description).toBe('');
       expect(result.data.template).toBe('feature');
       expect(result.data.repo).toBe('main-site');

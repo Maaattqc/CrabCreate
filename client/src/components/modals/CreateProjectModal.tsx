@@ -3,6 +3,8 @@ import { X, Lock, Users, Link, FolderPlus, Github, GitBranch, Loader2, ArrowLeft
 import { useLanguage } from '../../hooks/useLanguage';
 import { useProject } from '../../hooks/useProject';
 import { connectRepo, testConnection } from '../../api/project-setup';
+import VoiceInput from '../common/VoiceInput';
+import VoiceTextarea from '../common/VoiceTextarea';
 import type { GitProviderType } from '../../types';
 
 interface CreateProjectModalProps {
@@ -257,7 +259,7 @@ export default function CreateProjectModal({ onClose }: CreateProjectModalProps)
             {/* Project details */}
             <div>
               <label className="text-sm font-medium text-tx-secondary block mb-1">{t.projectName} *</label>
-              <input
+              <VoiceInput
                 type="text"
                 value={name}
                 onChange={e => autoSlug(e.target.value)}
@@ -293,7 +295,7 @@ export default function CreateProjectModal({ onClose }: CreateProjectModalProps)
 
             <div>
               <label className="text-sm font-medium text-tx-secondary block mb-1">{t.projectDescription}</label>
-              <textarea
+              <VoiceTextarea
                 value={description}
                 onChange={e => setDescription(e.target.value)}
                 rows={2}

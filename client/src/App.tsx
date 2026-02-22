@@ -41,6 +41,7 @@ import { AuthProvider, useAuth } from './hooks/useAuth';
 import { ProjectProvider, useProject } from './hooks/useProject';
 import { LoginModalProvider, useLoginModal } from './hooks/useLoginModal';
 import { getSetupStatus } from './api/project-setup';
+import { modifyChatCode } from './api/tickets';
 import type { Ticket } from './types';
 
 /** Layout wrapper for public pages (navbar + footer) */
@@ -148,7 +149,7 @@ function Dashboard() {
   const { cursors, presence, sendCursorMove, sendCursorLeave } = useCursors();
   const { tickets, fetchTickets, resetAndFetch, create, remove, launch, approve, reject, retry, rollback, archive, unarchive, updateTicketInState, insertLocalTicket, removeLocalTicket, reorder, clearTickets } = useTickets();
   const { notifications, addNotification, removeNotification } = useNotifications(appConfig.notification_timeout_ms);
-  const { on, off, emit } = useSocket();
+  const { connected, wasReconnected, clearReconnected, on, off, emit } = useSocket();
   const { t } = useLanguage();
   const { aiDesign } = useAIDesign();
   const { currentProject, loading: projectsLoading } = useProject();
@@ -192,9 +193,11 @@ function Dashboard() {
       addNotification(data.message, data.type);
     });
 
-    on('ticket:status', (data: { ticketId: number; status: string; progress: number }) => {
-      updateTicketInState(data.ticketId, { status: data.status, progress: data.progress });
-      setSelectedTicket(prev => prev && prev.id === data.ticketId ? { ...prev, status: data.status, progress: data.progress } : prev);
+    on('ticket:status', (data: { ticketId: number; status: string; progress: number; column_position?: number }) => {
+      const fields: Partial<Ticket> = { status: data.status, progress: data.progress };
+      if (data.column_position !== undefined) fields.column_position = data.column_position;
+      updateTicketInState(data.ticketId, fields);
+      setSelectedTicket(prev => prev && prev.id === data.ticketId ? { ...prev, ...fields } : prev);
     });
 
     on('ticket:updated', (data: { ticketId: number } & Partial<Ticket>) => {
@@ -211,6 +214,23 @@ function Dashboard() {
       off('ticket:updated');
     };
   }, [on, off, addNotification, updateTicketInState, fetchTickets]);
+
+  // Reconnection: refetch data when socket reconnects after a disconnect
+  const prevConnectedRef = useRef(connected);
+  useEffect(() => {
+    if (wasReconnected && currentProject) {
+      fetchTickets();
+      addNotification(t.socketReconnected, 'info');
+      clearReconnected();
+    }
+  }, [wasReconnected, currentProject, fetchTickets, addNotification, clearReconnected, t.socketReconnected]);
+
+  useEffect(() => {
+    if (prevConnectedRef.current && !connected) {
+      addNotification(t.socketDisconnected, 'warning');
+    }
+    prevConnectedRef.current = connected;
+  }, [connected, addNotification, t.socketDisconnected]);
 
   // Ctrl+K handler
   const handleCmdK = useCallback(() => setShowCmd(true), []);
@@ -299,7 +319,9 @@ function Dashboard() {
       depends_on: '[]',
       complexity: '',
       pipeline_step: 0,
+      pipeline_started_at: null,
       position: 0,
+      column_position: 0,
       due_date: null,
       archived_at: null,
       branch_name: '',
@@ -432,6 +454,15 @@ function Dashboard() {
           onClose={() => setReviewTicket(null)}
           onApprove={async (id: number) => { await approve(id); setReviewTicket(null); }}
           onReject={async (id: number) => { await reject(id); setReviewTicket(null); }}
+          onModify={async (id: number, message: string, images?: { data: string; mediaType: string }[]) => {
+            try {
+              await modifyChatCode(id, message, images);
+              setReviewTicket(null);
+              addNotification(`${t.continueModifying} #${id}`, 'info');
+            } catch (err) {
+              addNotification(`${t.error}: ${(err as Error).message}`, 'error');
+            }
+          }}
         />
       )}
 

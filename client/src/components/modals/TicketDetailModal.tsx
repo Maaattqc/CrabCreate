@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { X, RotateCcw, Undo2, Trash2, Activity, ShieldCheck, MessageSquare, Terminal, Code2, FlaskConical, User, Calendar, Eye, EyeOff, Users, Lock, CheckSquare, Clock, ExternalLink } from 'lucide-react';
-import { getColumnColor, getColumnLabel } from '../../constants';
+import VoiceInput from '../common/VoiceInput';
+import VoiceTextarea from '../common/VoiceTextarea';
+import { COLUMNS, getColumnColor, getColumnLabel } from '../../constants';
 import { updateTicket, getTicketColumnTimes } from '../../api/tickets';
 import { fetchWatchers, toggleWatch } from '../../api/comments';
 import { useLanguage } from '../../hooks/useLanguage';
@@ -76,11 +78,14 @@ export default function TicketDetailModal({ ticket, initialTab, onClose, onAppro
     return rh > 0 ? `${d}d ${rh}h` : `${d}d`;
   };
 
+  // Chat is only available after AI has coded (pipeline_step >= 4)
+  const hasCoded = ticket.pipeline_step >= 4 || ticket.lines_added > 0;
+
   const TABS = [
     { id: 'activity', label: t.tabActivity, icon: Activity },
     { id: 'comments', label: t.tabComments, icon: Users },
     { id: 'review', label: t.tabQuality, icon: ShieldCheck },
-    { id: 'chat', label: t.tabChat, icon: MessageSquare },
+    ...(hasCoded ? [{ id: 'chat', label: t.tabChat, icon: MessageSquare }] : []),
     { id: 'terminal', label: t.tabLogs, icon: Terminal },
     { id: 'diff', label: t.tabCode, icon: Code2 },
     { id: 'tests', label: t.tabTests, icon: FlaskConical },
@@ -183,7 +188,7 @@ export default function TicketDetailModal({ ticket, initialTab, onClose, onAppro
         <div className="px-8 pt-6 pb-4">
           <div className="flex items-start justify-between mb-4">
             <div className="flex items-center gap-3">
-              <span className="text-xs font-mono text-tx-faint bg-subtle px-2 py-1 rounded">#{ticket.id}</span>
+              {/* #{ticket.id} hidden by design */}
               <span
                 className="text-xs px-3 py-1 rounded-full font-semibold tracking-wide uppercase"
                 style={{ backgroundColor: statusColor + '18', color: statusColor, border: `1px solid ${statusColor}30` }}
@@ -255,7 +260,7 @@ export default function TicketDetailModal({ ticket, initialTab, onClose, onAppro
               {t.titleFieldLabel}
               {titleLock && <Lock size={10} className="text-amber-400" />}
             </span>
-            <input
+            <VoiceInput
               ref={titleRef}
               value={title}
               onChange={e => { setTitle(e.target.value); setFieldError(null); }}
@@ -266,6 +271,7 @@ export default function TicketDetailModal({ ticket, initialTab, onClose, onAppro
               placeholder={t.titleFieldPlaceholder}
               maxLength={200}
               disabled={!!titleLock}
+              containerClassName="flex-1"
             />
           </div>
 
@@ -275,7 +281,7 @@ export default function TicketDetailModal({ ticket, initialTab, onClose, onAppro
               {t.descFieldLabel}
               {descLock && <Lock size={10} className="text-amber-400" />}
             </span>
-            <textarea
+            <VoiceTextarea
               ref={descRef}
               value={description}
               onChange={e => setDescription(e.target.value)}
@@ -307,8 +313,8 @@ export default function TicketDetailModal({ ticket, initialTab, onClose, onAppro
               }}
               className="text-[11px] text-tx-faint bg-subtle px-2.5 py-1 rounded-md border-none outline-none cursor-pointer hover:bg-subtle-hover transition-colors"
             >
-              <option value="claude">🟣 Claude</option>
               <option value="gpt">🟢 GPT</option>
+              <option value="claude">🟣 Claude</option>
             </select>
             {ticket.ai_review_score != null && (
               <span className={`text-[11px] font-medium px-2.5 py-1 rounded-md ${
@@ -336,9 +342,9 @@ export default function TicketDetailModal({ ticket, initialTab, onClose, onAppro
                 <span className="text-red-400">-{ticket.lines_removed}</span>
               </span>
             )}
-            {ticket.pipeline_step > 0 && isActive && (
+            {isActive && (
               <span className="text-[11px] font-medium px-2.5 py-1 rounded-md bg-cyan-500/10 text-cyan-400">
-                {t.pipelineStep} {ticket.pipeline_step}/7
+                {t.pipelineStep} {COLUMNS.findIndex(c => c.id === ticket.status) + 1}/{COLUMNS.length}
               </span>
             )}
             {/* Due date pill */}

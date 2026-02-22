@@ -3,7 +3,7 @@ import { z } from 'zod';
 export const createTicketSchema = z.object({
   title: z.string().min(3, 'Titre trop court (min 3 caractères)').max(200, 'Titre trop long (max 200)'),
   description: z.string().max(5000, 'Description trop longue').optional().default(''),
-  ai_model: z.enum(['claude', 'gpt']).optional().default('claude'),
+  ai_model: z.enum(['claude', 'gpt']).optional().default('gpt'),
   priority: z.enum(['low', 'medium', 'high', 'critical']).optional().default('medium'),
   template: z.string().max(100).optional().default('feature'),
   repo: z.string().min(1).max(120).optional().default('main-site'),
@@ -31,6 +31,14 @@ export const updateTicketSchema = z.object({
 
 export const sendChatSchema = z.object({
   message: z.string().min(1, 'Message requis').max(10000, 'Message trop long'),
+});
+
+export const modifyChatSchema = z.object({
+  message: z.string().min(1, 'Message requis').max(10000, 'Message trop long'),
+  images: z.array(z.object({
+    data: z.string().min(1),
+    mediaType: z.string().regex(/^image\/(jpeg|png|gif|webp)$/),
+  })).max(4).optional(),
 });
 
 export const updatePromptsSchema = z.object({
@@ -200,10 +208,12 @@ export const toggleReactionSchema = z.object({
 
 export const createSubtaskSchema = z.object({
   title: z.string().min(1, 'Titre requis').max(200, 'Titre trop long (max 200)'),
+  description: z.string().max(5000).optional().default(''),
 });
 
 export const updateSubtaskSchema = z.object({
   title: z.string().min(1).max(200).optional(),
+  description: z.string().max(5000).optional(),
   completed: z.number().int().min(0).max(1).optional(),
   position: z.number().int().min(0).optional(),
 }).refine(data => Object.keys(data).length > 0, { message: 'At least one field required' });

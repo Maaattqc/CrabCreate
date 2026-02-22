@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { X, Pencil, Trash2, Plus } from 'lucide-react';
 import { useLanguage } from '../../hooks/useLanguage';
+import VoiceInput from '../common/VoiceInput';
 import type { Label } from '../../types';
 
 interface LabelManagerProps {
@@ -93,12 +94,13 @@ export default function LabelManager({ labels, onCreateLabel, onUpdateLabel, onD
                 /* Editing mode */
                 <div className="flex flex-col gap-2 p-3 bg-subtle rounded-lg border border-th-border">
                   <div className="flex items-center gap-2">
-                    <input
+                    <VoiceInput
                       value={editName}
                       onChange={e => setEditName(e.target.value)}
                       className="flex-1 bg-card border border-th-border-strong rounded-lg px-3 py-1.5 text-sm text-tx-secondary focus:outline-none focus:border-amber-500/50"
                       placeholder={t.labelName}
                       maxLength={50}
+                      containerClassName="flex-1"
                     />
                     <button
                       onClick={() => handleUpdate(label.id)}
@@ -158,13 +160,14 @@ export default function LabelManager({ labels, onCreateLabel, onUpdateLabel, onD
         <div className="px-4 pb-4 pt-2 border-t border-th-border">
           <p className="text-xs text-tx-faint mb-2 font-medium">{t.labelCreate}</p>
           <div className="flex items-center gap-2">
-            <input
+            <VoiceInput
               value={newName}
               onChange={e => setNewName(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') handleCreate(); }}
               className="flex-1 bg-subtle border border-th-border-strong rounded-lg px-3 py-1.5 text-sm text-tx-secondary focus:outline-none focus:border-amber-500/50"
               placeholder={t.labelName}
               maxLength={50}
+              containerClassName="flex-1"
             />
             <button
               onClick={handleCreate}

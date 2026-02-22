@@ -12,6 +12,10 @@ import logger from './logger';
 import { createPatch, applyPatch } from 'diff';
 import type { Ticket, CodingResult, DeployResult, CodeFile, Repo } from '../types';
 
+// ── Per-project production deploy lock (serialize concurrent approvals) ───
+
+const productionDeployQueue = new Map<number, Promise<void>>();
+
 // ── Ticket file storage (filesystem) ────────────────────────────────────────
 
 function ticketFilesDir(ticketId: number): string {
@@ -62,6 +66,45 @@ function readTicketFiles(ticketId: number): { codingFiles: CodeFile[]; baseFiles
     codingFiles: readFiles(codingDir, manifest.coding || []),
     baseFiles: readFiles(baseDir, manifest.base || []),
   };
+}
+
+/** Save pending chat modification files to disk. */
+function savePendingChatFiles(ticketId: number, files: CodeFile[]): void {
+  const dir = path.join(ticketFilesDir(ticketId), 'pending');
+  fs.mkdirSync(dir, { recursive: true });
+  for (const file of files) {
+    const filePath = path.resolve(dir, file.path);
+    if (!filePath.startsWith(path.resolve(dir) + path.sep) && filePath !== path.resolve(dir)) continue;
+    const fileDir = path.dirname(filePath);
+    if (!fs.existsSync(fileDir)) fs.mkdirSync(fileDir, { recursive: true });
+    fs.writeFileSync(filePath, file.content, 'utf-8');
+  }
+  fs.writeFileSync(path.join(dir, 'manifest.json'), JSON.stringify({ files: files.map(f => f.path) }), 'utf-8');
+}
+
+/** Check if there are pending chat modification files. */
+function hasPendingChatFiles(ticketId: number): boolean {
+  const manifest = path.join(ticketFilesDir(ticketId), 'pending', 'manifest.json');
+  return fs.existsSync(manifest);
+}
+
+/** Read pending chat modification files from disk. */
+function readPendingChatFiles(ticketId: number): CodeFile[] {
+  const dir = path.join(ticketFilesDir(ticketId), 'pending');
+  const manifestPath = path.join(dir, 'manifest.json');
+  if (!fs.existsSync(manifestPath)) return [];
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
+  return (manifest.files || []).map((p: string) => {
+    const filePath = path.resolve(dir, p);
+    if (!fs.existsSync(filePath)) return null;
+    return { path: p, content: fs.readFileSync(filePath, 'utf-8') };
+  }).filter(Boolean) as CodeFile[];
+}
+
+/** Clear pending chat modification files after apply. */
+function clearPendingChatFiles(ticketId: number): void {
+  const dir = path.join(ticketFilesDir(ticketId), 'pending');
+  try { if (fs.existsSync(dir)) fs.rmSync(dir, { recursive: true }); } catch { /* ignore */ }
 }
 
 /** Delete stored ticket files after approval or rejection. */
@@ -436,6 +479,21 @@ function mergeFiles(
  * Reads ticket files from filesystem, fetches production state from live CF site.
  */
 async function mergeToProduction(ticket: Ticket): Promise<void> {
+  // Serialize production deploys per project to prevent race conditions
+  // (e.g. approve #50 then #49 → #49 must wait for #50's deploy to finish
+  //  so it fetches the latest production state including #50's changes)
+  if (ticket.project_id) {
+    const prev = productionDeployQueue.get(ticket.project_id) ?? Promise.resolve();
+    const current = prev
+      .catch(() => {}) // don't block on previous failures
+      .then(() => doMergeToProduction(ticket));
+    productionDeployQueue.set(ticket.project_id, current.catch(() => {}));
+    return current;
+  }
+  return doMergeToProduction(ticket);
+}
+
+async function doMergeToProduction(ticket: Ticket): Promise<void> {
   const repo = resolveAuthorizedRepo(ticket);
 
   // Git repo path: merge the PR
@@ -553,4 +611,4 @@ async function rollback(ticket: Ticket): Promise<void> {
   emitTicketLog(ticket.id, 'Rollback terminé', 'success', 'deploying');
 }
 
-export { deployToStaging, mergeToProduction, closePR, rollback, saveTicketFiles, cleanupTicketFiles };
+export { deployToStaging, mergeToProduction, closePR, rollback, saveTicketFiles, readTicketFiles, cleanupTicketFiles, savePendingChatFiles, hasPendingChatFiles, readPendingChatFiles, clearPendingChatFiles };

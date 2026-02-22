@@ -54,6 +54,7 @@ const NUMERIC_KEYS = [
   // Queue & Pipeline
   'queue_polling_interval_ms',
   'test_multiplier_per_file',
+  'pipeline_timeout_minutes',
   // Interface
   'audit_log_default_limit',
   'audit_log_max_limit',
@@ -94,7 +95,7 @@ const DEFAULTS: Record<string, number | string> = {
   max_requests_per_minute: 60,
   max_tickets_per_hour: 20,
   max_concurrent_pipelines: 2,
-  default_ai_model: 'claude',
+  default_ai_model: 'gpt',
   ai_review_threshold: 50,
   ai_max_tokens: 8192,
   dev_login_enabled: 1,
@@ -140,6 +141,7 @@ const DEFAULTS: Record<string, number | string> = {
   // Queue & Pipeline
   queue_polling_interval_ms: 5000,
   test_multiplier_per_file: 3,
+  pipeline_timeout_minutes: 30,
   // Interface
   audit_log_default_limit: 50,
   audit_log_max_limit: 200,
@@ -179,6 +181,7 @@ const NUMERIC_BOUNDS: Record<string, { min: number; max: number }> = {
   branch_name_max_length: { min: 15, max: 100 },
   queue_polling_interval_ms: { min: 1000, max: 30000 },
   test_multiplier_per_file: { min: 1, max: 10 },
+  pipeline_timeout_minutes: { min: 5, max: 180 },
   audit_log_default_limit: { min: 10, max: 100 },
   audit_log_max_limit: { min: 100, max: 1000 },
   notification_timeout_ms: { min: 2000, max: 15000 },

@@ -25,7 +25,7 @@ router.post('/:ticketId/subtasks', validate(createSubtaskSchema), (req: Request,
   if (!hasMinRole(req.project!.userRole, 'member')) {
     return res.status(403).json({ error: 'Viewers cannot create subtasks' });
   }
-  const subtask = repo.createSubtask(ticketId, req.body.title);
+  const subtask = repo.createSubtask(ticketId, req.body.title, req.body.description || '');
   res.status(201).json(subtask);
 });
 
