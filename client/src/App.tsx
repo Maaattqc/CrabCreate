@@ -385,7 +385,7 @@ function Dashboard() {
   };
 
   return (
-    <div className={`h-screen text-tx-primary overflow-hidden flex flex-col bg-animated relative ${aiDesign ? 'ai-dot-grid' : ''} animate-[dashboardIn_0.6s_ease-out]`} style={{ background: 'var(--bg-gradient)' }}>
+    <div className={`h-screen text-tx-primary overflow-hidden flex flex-col bg-animated relative 2xl:text-[15px] ${aiDesign ? 'ai-dot-grid' : ''} animate-[dashboardIn_0.6s_ease-out]`} style={{ background: 'var(--bg-gradient)' }}>
       <Header
         search={search}
         onSearchChange={setSearch}

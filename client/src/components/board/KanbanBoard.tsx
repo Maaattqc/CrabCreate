@@ -54,15 +54,15 @@ export default function KanbanBoard({ tickets, onTicketClick, onLaunch, onArchiv
 
   return (
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-    <div className="flex-1 overflow-x-auto flex flex-col">
+    <div className="flex-1 overflow-x-auto snap-x snap-mandatory lg:snap-none flex flex-col">
       {/* Pipeline flow indicator */}
-      <div className="px-3 pt-3 pb-1">
+      <div className="px-2 pt-2 sm:px-3 sm:pt-3 pb-1">
         <div className="flex items-center">
           {COLUMNS.map((col, i) => {
             const hasTickets = activeStatuses.has(col.id);
             const isPast = i <= lastActiveIdx;
             return (
-              <div key={col.id} className="flex items-center flex-1 min-w-[140px]">
+              <div key={col.id} className="flex items-center flex-1 min-w-[200px] sm:min-w-[140px]">
                 <div className="flex flex-col items-center flex-1">
                   {/* Dot + line */}
                   <div className="flex items-center w-full">
@@ -104,7 +104,7 @@ export default function KanbanBoard({ tickets, onTicketClick, onLaunch, onArchiv
       </div>
 
       {/* Columns */}
-      <div className="flex gap-0 flex-1 px-3 pb-3" data-onboard="columns">
+      <div className="flex gap-0 flex-1 px-1.5 pb-2 sm:px-2 lg:px-3 lg:pb-3" data-onboard="columns">
         {COLUMNS.map((column, i) => {
           const columnTickets = tickets
             .filter(t => t.status === column.id)
@@ -114,7 +114,7 @@ export default function KanbanBoard({ tickets, onTicketClick, onLaunch, onArchiv
                 : (a.column_position ?? 0) - (b.column_position ?? 0)
             );
           return (
-            <div key={column.id} className="flex flex-1 min-w-[140px]">
+            <div key={column.id} className="flex flex-1 min-w-[240px] sm:min-w-[180px] lg:min-w-0 snap-start">
               <Column
                 column={column}
                 tickets={columnTickets}

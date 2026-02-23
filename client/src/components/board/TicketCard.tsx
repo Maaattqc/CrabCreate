@@ -58,7 +58,7 @@ export default function TicketCard({ ticket, onClick, onLaunch, onArchive, onRev
   return (
     <div
       onClick={() => onClick(ticket)}
-      className={`group bg-card border border-th-border rounded-xl p-3.5 cursor-pointer hover:border-th-border-strong hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/20 transition-all relative overflow-hidden anim-card anim-card-border animate-[cardSlideIn_0.4s_ease-out] ${aiDesign ? 'ai-glass' : ''} ${isActive && aiDesign ? 'ai-neon-active' : ''}`}
+      className={`group bg-card border border-th-border rounded-xl p-2.5 sm:p-3 lg:p-3.5 cursor-pointer hover:border-th-border-strong hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/20 transition-all relative overflow-hidden anim-card anim-card-border animate-[cardSlideIn_0.4s_ease-out] ${aiDesign ? 'ai-glass' : ''} ${isActive && aiDesign ? 'ai-neon-active' : ''}`}
       style={isActive && aiDesign ? { '--neon-color': `${statusColor}30` } as React.CSSProperties : undefined}
     >
       {/* Left color accent */}
@@ -113,7 +113,7 @@ export default function TicketCard({ ticket, onClick, onLaunch, onArchive, onRev
         )}
 
         {/* Title */}
-        <h4 className="text-[15px] text-tx-primary font-semibold leading-snug mb-1.5 line-clamp-2">{ticket.title}</h4>
+        <h4 className="text-sm sm:text-[15px] text-tx-primary font-semibold leading-snug mb-1.5 line-clamp-2">{ticket.title}</h4>
 
         {/* Tags */}
         {aiDesign && tags.length > 0 && (
@@ -155,7 +155,7 @@ export default function TicketCard({ ticket, onClick, onLaunch, onArchive, onRev
 
         {/* Cost & lines stats for active/completed pipeline tickets */}
         {(ticket.cost_usd > 0 || ticket.lines_added > 0) && (
-          <div className="flex items-center gap-3 mb-2 text-[11px] font-mono text-tx-faint">
+          <div className="flex items-center gap-3 mb-2 text-[10px] sm:text-[11px] font-mono text-tx-faint">
             {ticket.cost_usd > 0 && (
               <span className="flex items-center gap-1">
                 {ticket.cost_usd.toFixed(2)}<span className="text-amber-400">$</span>

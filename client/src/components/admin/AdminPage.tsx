@@ -302,7 +302,7 @@ export default function AdminPage() {
   return (
     <div className="h-screen flex flex-col text-tx-primary overflow-hidden" style={{ background: 'var(--bg-gradient)' }}>
       {/* Header */}
-      <header className="h-14 bg-surface border-b border-th-border flex items-center px-6 gap-4 relative z-50">
+      <header className="h-14 bg-surface border-b border-th-border flex items-center px-3 gap-2 sm:px-4 sm:gap-3 lg:px-6 lg:gap-4 relative z-50">
         <button onClick={() => navigate('/dashboard')} className="p-2 rounded-lg hover:bg-subtle-hover transition-colors text-tx-faint hover:text-tx-primary">
           <ArrowLeft size={18} />
         </button>
@@ -312,14 +312,14 @@ export default function AdminPage() {
         <span className="text-xs text-tx-faint font-mono">{user?.email}</span>
       </header>
 
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex flex-col sm:flex-row overflow-hidden">
         {/* Sidebar tabs */}
-        <nav className="w-56 bg-surface border-r border-th-border flex flex-col p-3 gap-1 shrink-0">
+        <nav className="w-full sm:w-56 bg-surface flex-row sm:flex-col border-b sm:border-b-0 sm:border-r border-th-border flex p-2 sm:p-3 gap-1 shrink-0 overflow-x-auto sm:overflow-x-visible">
           {tabs.map(({ key, icon: Icon, label }) => (
             <button
               key={key}
               onClick={() => setTab(key)}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
+              className={`flex items-center gap-1.5 sm:gap-3 px-2.5 py-2 sm:px-3 sm:py-2.5 rounded-lg text-xs sm:text-sm whitespace-nowrap transition-colors ${
                 tab === key ? 'bg-amber-500/10 text-amber-400 font-medium' : 'text-tx-faint hover:bg-subtle-hover hover:text-tx-secondary'
               }`}
             >
@@ -330,7 +330,7 @@ export default function AdminPage() {
         </nav>
 
         {/* Main content */}
-        <main className="flex-1 overflow-y-auto p-6">
+        <main className="flex-1 overflow-y-auto p-3 sm:p-4 lg:p-6">
           {tab === 'stats' && <StatsTab stats={stats} t={t} />}
           {tab === 'users' && (
             <UsersTab
@@ -422,7 +422,7 @@ function StatsTab({ stats, t }: { stats: AdminStats; t: any }) {
   return (
     <div>
       <h2 className="text-xl font-bold mb-6 text-tx-primary">{t.adminStats}</h2>
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4 mb-8">
         {cards.map(c => (
           <div key={c.label} className="bg-card border border-th-border rounded-xl p-5">
             <p className="text-xs text-tx-faint mb-1">{c.label}</p>
@@ -893,13 +893,13 @@ function SettingsTab({
       </div>
 
       {/* Grille 2 colonnes */}
-      <div className="flex-1 grid grid-cols-2 gap-3 auto-rows-min content-start">
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-3 auto-rows-min content-start">
         {categories.map(cat => (
           <SettingsCard key={cat.key} category={cat} draft={draft} onChange={onChange} t={t} />
         ))}
 
         {/* Plans — pleine largeur */}
-        <div className="col-span-2">
+        <div className="lg:col-span-2">
           <PlansCard draft={draft} onChange={onChange} t={t} />
         </div>
       </div>

@@ -64,14 +64,14 @@ export default function CreateTicketModal({ onClose, onCreate }: CreateTicketMod
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-modal-overlay backdrop-blur-sm" onClick={onClose}>
-      <div className="bg-card border border-th-border-strong rounded-xl w-full max-w-md mx-4" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+      <div className="bg-card border border-th-border-strong rounded-xl w-full max-w-md mx-2 sm:mx-4" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-th-border">
+        <div className="flex items-center justify-between px-4 py-3 sm:px-6 sm:py-4 border-b border-th-border">
           <h2 className="text-base font-semibold text-tx-primary">{t.createTitle}</h2>
           <button onClick={onClose} className="text-tx-faint hover:text-tx-tertiary"><X size={18} /></button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4">
           {/* Title */}
           <div>
             <label className="block text-xs text-tx-muted mb-1">{t.titleLabel}</label>

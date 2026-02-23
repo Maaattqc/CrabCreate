@@ -71,11 +71,11 @@ export default function LabelManager({ labels, onCreateLabel, onUpdateLabel, onD
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-modal-overlay backdrop-blur-sm" onClick={onClose}>
       <div
-        className="bg-card border border-th-border-strong rounded-xl w-full max-w-md mx-4 shadow-2xl shadow-black/40"
+        className="bg-card border border-th-border-strong rounded-xl w-full max-w-md mx-2 sm:mx-4 shadow-2xl shadow-black/40"
         onClick={(e: React.MouseEvent) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-th-border">
+        <div className="flex items-center justify-between px-4 py-3 sm:px-6 sm:py-4 border-b border-th-border">
           <h2 className="text-base font-semibold text-tx-primary">{t.labels}</h2>
           <button onClick={onClose} className="text-tx-faint hover:text-tx-tertiary transition-colors">
             <X size={18} />

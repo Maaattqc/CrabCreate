@@ -107,8 +107,8 @@ export default function CreateProjectModal({ onClose }: CreateProjectModalProps)
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={onClose}>
-      <div className="bg-card border border-th-border-strong rounded-2xl shadow-2xl w-full max-w-md mx-4 animate-[fadeSlideIn_0.2s_ease-out] max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-6 py-4 border-b border-th-border">
+      <div className="bg-card border border-th-border-strong rounded-2xl shadow-2xl w-full max-w-md mx-2 sm:mx-4 animate-[fadeSlideIn_0.2s_ease-out] max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-4 py-3 sm:px-6 sm:py-4 border-b border-th-border">
           <div className="flex items-center gap-2">
             {mode && (
               <button onClick={() => { setMode(null); setError(''); }} className="text-tx-faint hover:text-tx-secondary">
@@ -122,7 +122,7 @@ export default function CreateProjectModal({ onClose }: CreateProjectModalProps)
 
         {/* Step 1: Choice screen */}
         {!mode && (
-          <div className="p-6 space-y-3">
+          <div className="p-4 sm:p-6 space-y-3">
             <button
               onClick={() => setMode('new')}
               className="w-full flex items-center gap-4 p-4 rounded-xl border border-th-border hover:border-amber-500/50 hover:bg-amber-500/5 transition-colors text-left group"
@@ -153,7 +153,7 @@ export default function CreateProjectModal({ onClose }: CreateProjectModalProps)
 
         {/* Step 2: Project form (+ git fields if connect mode) */}
         {mode && (
-          <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4">
             {/* Git connection fields — only in connect mode */}
             {mode === 'connect' && (
               <>
@@ -189,7 +189,7 @@ export default function CreateProjectModal({ onClose }: CreateProjectModalProps)
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="text-sm font-medium text-tx-secondary block mb-1">{t.setupOwner}</label>
                     <input
@@ -214,7 +214,7 @@ export default function CreateProjectModal({ onClose }: CreateProjectModalProps)
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="text-sm font-medium text-tx-secondary block mb-1">{t.setupSourceBranch}</label>
                     <input

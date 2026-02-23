@@ -198,11 +198,11 @@ export default function Header({ search, onSearchChange, viewMode, onViewModeCha
   };
 
   return (
-    <header className={`h-14 bg-surface border-b border-th-border flex items-center px-6 gap-5 relative z-50 ${aiDesign ? 'ai-glass-header' : ''}`}>
+    <header className={`h-14 bg-surface border-b border-th-border flex items-center px-3 gap-2 sm:px-4 sm:gap-3 lg:px-6 lg:gap-5 relative z-50 ${aiDesign ? 'ai-glass-header' : ''}`}>
       {/* Logo + optional AI orb */}
       <div className="flex items-center gap-2.5">
         <span className="brand-emoji text-lg leading-none" aria-hidden="true">🦀</span>
-        <span className="text-lg font-extrabold bg-gradient-to-r from-amber-300 via-orange-400 to-rose-400 bg-clip-text text-transparent font-display tracking-tight anim-logo">CrabCreate</span>
+        <span className="hidden sm:inline text-base sm:text-lg font-extrabold bg-gradient-to-r from-amber-300 via-orange-400 to-rose-400 bg-clip-text text-transparent font-display tracking-tight anim-logo">CrabCreate</span>
         {aiDesign && (
           <div className={`ai-orb ${hasActive ? '' : 'ai-orb-idle'}`}>
             <div className="ai-orb-ring" />
@@ -216,7 +216,7 @@ export default function Header({ search, onSearchChange, viewMode, onViewModeCha
         <div className="relative" ref={projectMenuRef}>
           <button
             onClick={() => setProjectMenuOpen(!projectMenuOpen)}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-th-border hover:bg-subtle-hover transition-colors max-w-[180px]"
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-th-border hover:bg-subtle-hover transition-colors max-w-[120px] sm:max-w-[180px]"
           >
             <FolderKanban size={14} className="text-amber-400 shrink-0" />
             <span className="text-xs text-tx-secondary truncate">{currentProject.name}</span>
@@ -287,7 +287,9 @@ export default function Header({ search, onSearchChange, viewMode, onViewModeCha
 
       {/* Online presence avatars */}
       {presenceUsers && presenceUsers.length > 0 && (
-        <PresenceAvatars users={presenceUsers} maxVisible={currentProject?.presence_max_visible} />
+        <div className="hidden sm:flex">
+          <PresenceAvatars users={presenceUsers} maxVisible={currentProject?.presence_max_visible} />
+        </div>
       )}
 
       {/* Notification bell */}
@@ -301,7 +303,7 @@ export default function Header({ search, onSearchChange, viewMode, onViewModeCha
         {aiDesign && onCmdK ? (
           <button
             onClick={onCmdK}
-            className="bg-subtle border border-th-border-strong rounded-lg pl-10 pr-4 py-2 text-sm text-tx-faint w-64 text-left flex items-center justify-between hover:border-th-border transition-colors"
+            className="bg-subtle border border-th-border-strong rounded-lg pl-10 pr-4 py-2 text-sm text-tx-faint w-48 md:w-56 lg:w-64 text-left flex items-center justify-between hover:border-th-border transition-colors"
           >
             <span>{t.search}</span>
             <kbd className="text-[10px] text-tx-ghost bg-subtle-hover px-1.5 py-0.5 rounded font-mono">Ctrl+K</kbd>
@@ -312,14 +314,14 @@ export default function Header({ search, onSearchChange, viewMode, onViewModeCha
             placeholder={t.search}
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="bg-subtle border border-th-border-strong rounded-lg pl-10 pr-4 py-2 text-sm text-tx-secondary placeholder-tx-faint focus:outline-none focus:border-amber-500/50 w-64"
+            className="bg-subtle border border-th-border-strong rounded-lg pl-10 pr-4 py-2 text-sm text-tx-secondary placeholder-tx-faint focus:outline-none focus:border-amber-500/50 w-48 md:w-56 lg:w-64"
           />
         )}
       </div>
 
       {/* View mode toggle */}
       {onViewModeChange && (
-        <div className="flex bg-subtle rounded-lg p-0.5">
+        <div className="hidden sm:flex bg-subtle rounded-lg p-0.5">
           <button
             onClick={() => onViewModeChange('board')}
             className={`p-2 rounded-md transition-colors ${viewMode === 'board' ? 'bg-subtle-hover text-tx-primary' : 'text-tx-faint hover:text-tx-tertiary'}`}
@@ -346,7 +348,7 @@ export default function Header({ search, onSearchChange, viewMode, onViewModeCha
       )}
 
       {/* Export dropdown */}
-      <div className="relative" ref={exportRef}>
+      <div className="hidden sm:block relative" ref={exportRef}>
         <button
           onClick={() => setExportOpen(!exportOpen)}
           className="p-2 rounded-lg text-tx-faint hover:bg-subtle-hover hover:text-tx-tertiary transition-colors"

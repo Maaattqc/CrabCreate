@@ -24,7 +24,7 @@ export default function Column({ column, tickets, onTicketClick, onLaunch, onArc
   const { t } = useLanguage();
 
   return (
-    <div className="flex flex-col flex-1 min-w-[140px] px-1.5" data-column={column.id}>
+    <div className="flex flex-col flex-1 min-w-[240px] sm:min-w-[180px] lg:min-w-0 px-1 sm:px-1.5" data-column={column.id}>
       {/* Column header */}
       <div className="mb-2 pt-1">
         <div className="flex items-center gap-2 px-1.5 py-1.5">
@@ -34,7 +34,7 @@ export default function Column({ column, tickets, onTicketClick, onLaunch, onArc
           >
             {stepNumber}
           </span>
-          <span className="text-sm font-bold text-tx-secondary truncate">{getColumnLabel(column.id, t as unknown as Record<string, string>)}</span>
+          <span className="text-xs sm:text-sm font-bold text-tx-secondary truncate">{getColumnLabel(column.id, t as unknown as Record<string, string>)}</span>
           <span
             className="text-xs font-mono font-semibold ml-auto px-2 py-0.5 rounded-full shrink-0"
             style={{

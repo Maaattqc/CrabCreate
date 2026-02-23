@@ -181,11 +181,11 @@ export default function TicketDetailModal({ ticket, initialTab, onClose, onAppro
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
       <div
-        className="bg-surface border border-th-border-strong rounded-2xl w-full max-w-4xl mx-4 max-h-[90vh] flex flex-col shadow-2xl shadow-black/40 transition-all duration-300"
+        className="bg-surface border border-th-border-strong rounded-2xl w-full max-w-4xl mx-2 sm:mx-4 max-h-[95vh] sm:max-h-[90vh] 2xl:max-w-5xl flex flex-col shadow-2xl shadow-black/40 transition-all duration-300"
         onClick={(e: React.MouseEvent) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="px-8 pt-6 pb-4">
+        <div className="px-4 pt-4 pb-3 sm:px-6 sm:pt-5 lg:px-8 lg:pt-6 lg:pb-4">
           <div className="flex items-start justify-between mb-4">
             <div className="flex items-center gap-3">
               {/* #{ticket.id} hidden by design */}
@@ -267,7 +267,7 @@ export default function TicketDetailModal({ ticket, initialTab, onClose, onAppro
               onFocus={() => handleFieldFocus('title')}
               onBlur={() => { saveField('title', title); handleFieldBlur('title'); }}
               onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); titleRef.current?.blur(); } }}
-              className={`w-full text-xl font-bold text-tx-primary bg-transparent border-0 border-b border-transparent hover:border-th-border focus:border-amber-500/50 focus:outline-none px-0 py-1 transition-colors placeholder-tx-ghost ${titleLock ? 'opacity-60 pointer-events-none' : ''}`}
+              className={`w-full text-base sm:text-lg lg:text-xl font-bold text-tx-primary bg-transparent border-0 border-b border-transparent hover:border-th-border focus:border-amber-500/50 focus:outline-none px-0 py-1 transition-colors placeholder-tx-ghost ${titleLock ? 'opacity-60 pointer-events-none' : ''}`}
               placeholder={t.titleFieldPlaceholder}
               maxLength={200}
               disabled={!!titleLock}
@@ -441,7 +441,7 @@ export default function TicketDetailModal({ ticket, initialTab, onClose, onAppro
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1 px-8 border-b border-th-border">
+        <div className="flex gap-0.5 px-3 sm:px-4 lg:px-8 overflow-x-auto border-b border-th-border">
           {TABS.map(tab => {
             const Icon = tab.icon;
             const active = activeTab === tab.id;
@@ -449,14 +449,14 @@ export default function TicketDetailModal({ ticket, initialTab, onClose, onAppro
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium transition-all relative rounded-t-lg ${
+                className={`flex items-center gap-1.5 px-2 py-2 sm:px-3 lg:px-4 lg:py-2.5 text-[11px] sm:text-xs font-medium transition-all relative rounded-t-lg whitespace-nowrap ${
                   active
                     ? 'text-amber-400 bg-subtle/50'
                     : 'text-tx-faint hover:text-tx-tertiary hover:bg-subtle/30'
                 }`}
               >
                 <Icon size={13} />
-                {tab.label}
+                <span className="hidden sm:inline">{tab.label}</span>
                 {active && <div className="absolute bottom-0 left-2 right-2 h-[2px] bg-amber-400 rounded-t" />}
               </button>
             );
@@ -476,7 +476,7 @@ export default function TicketDetailModal({ ticket, initialTab, onClose, onAppro
         </div>
 
         {/* Actions */}
-        <div className="px-8 py-4 border-t border-th-border flex items-center gap-3">
+        <div className="px-3 py-3 sm:px-6 lg:px-8 lg:py-4 border-t border-th-border flex items-center gap-3 flex-wrap">
           {ticket.status === 'review' && onReview && (
             <button
               onClick={() => { onClose(); onReview(ticket); }}

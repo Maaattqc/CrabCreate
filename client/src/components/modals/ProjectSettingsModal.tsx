@@ -143,26 +143,26 @@ export default function ProjectSettingsModal({ onClose }: ProjectSettingsModalPr
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={onClose}>
-      <div className="bg-card border border-th-border-strong rounded-2xl shadow-2xl w-full max-w-lg mx-4 max-h-[85vh] flex flex-col animate-[fadeSlideIn_0.2s_ease-out]" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-6 py-4 border-b border-th-border">
+      <div className="bg-card border border-th-border-strong rounded-2xl shadow-2xl w-full max-w-lg mx-2 sm:mx-4 max-h-[90vh] sm:max-h-[85vh] flex flex-col animate-[fadeSlideIn_0.2s_ease-out]" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-4 py-3 sm:px-6 sm:py-4 border-b border-th-border">
           <h2 className="text-lg font-semibold text-tx-primary">{t.projectSettings}</h2>
           <button onClick={onClose} className="text-tx-faint hover:text-tx-secondary"><X size={18} /></button>
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-th-border px-6">
+        <div className="flex border-b border-th-border px-3 sm:px-6 overflow-x-auto">
           {(['general', 'members', ...(isAdmin ? ['webhooks'] as const : []), 'danger'] as const).map(tb => (
             <button
               key={tb}
               onClick={() => setTab(tb as typeof tab)}
-              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${tab === tb ? 'border-amber-500 text-amber-400' : 'border-transparent text-tx-faint hover:text-tx-secondary'}`}
+              className={`px-2.5 py-2 sm:px-4 sm:py-2.5 text-xs sm:text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${tab === tb ? 'border-amber-500 text-amber-400' : 'border-transparent text-tx-faint hover:text-tx-secondary'}`}
             >
               {tb === 'general' ? t.projectGeneral : tb === 'members' ? t.projectMembers : tb === 'webhooks' ? t.webhooks : t.projectDangerZone}
             </button>
           ))}
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
           {/* General tab */}
           {tab === 'general' && (
             <>
@@ -288,7 +288,7 @@ export default function ProjectSettingsModal({ onClose }: ProjectSettingsModalPr
             <>
               {/* Invite form */}
               {isAdmin && (
-                <form onSubmit={handleInvite} className="flex gap-2">
+                <form onSubmit={handleInvite} className="flex flex-col sm:flex-row gap-2">
                   <VoiceInput
                     type="email"
                     value={inviteEmail}
