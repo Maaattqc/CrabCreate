@@ -4,7 +4,7 @@
 
 > 🌐 **[View live demo](https://mathieu-fournier.net/crabcreate/)** — deployed on mathieu-fournier.net
 
-> AI-powered Kanban dashboard that automates PHP development — create a ticket, the AI writes the code, pushes to Bitbucket, auto-reviews, and deploys via Jenkins.
+> AI-powered Kanban dashboard that automates software development — create a ticket, the AI writes the code, pushes to Bitbucket, auto-reviews, and deploys via Jenkins.
 
 ![React](https://img.shields.io/badge/React_19-61DAFB?style=flat&logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat&logo=typescript&logoColor=white)
@@ -15,7 +15,7 @@
 
 ## Why this project
 
-In a PHP legacy application maintenance context, manual modifications are slow and error-prone. CrabCreate transforms a Kanban ticket into working code: the AI (Claude/GPT) analyzes the existing codebase, generates changes, pushes to Bitbucket, triggers an automatic review, and fires a Jenkins deployment — the developer only needs to validate.
+In a legacy application maintenance context, manual modifications are slow and error-prone. CrabCreate transforms a Kanban ticket into working code: the AI (Claude/GPT) analyzes the existing codebase, generates changes, pushes to Bitbucket, triggers an automatic review, and fires a Jenkins deployment — the developer only needs to validate.
 
 ## Architecture
 

@@ -4,7 +4,7 @@
 
 > 🌐 **[Voir la démo live](https://mathieu-fournier.net/crabcreate/)** — déployé sur mathieu-fournier.net
 
-> Dashboard Kanban AI-powered qui automatise le développement PHP — de la création du ticket jusqu'au déploiement en production, sans intervention manuelle.
+> Dashboard Kanban AI-powered qui automatise le cycle de développement — de la création du ticket jusqu'au déploiement en production, sans intervention manuelle.
 
 ## Stack complète
 
@@ -94,7 +94,7 @@
 
 ## Pourquoi ce projet
 
-Dans un contexte de maintenance d'applications PHP legacy, les modifications manuelles sont lentes et error-prone. CrabCreate transforme un ticket Kanban en code fonctionnel : l'IA (Claude/GPT) analyse la codebase existante, génère les modifications, les pousse sur Bitbucket, lance une review automatique et déclenche le déploiement via Jenkins — le développeur n'a qu'à valider.
+Dans un contexte de maintenance d'applications legacy, les modifications manuelles sont lentes et error-prone. CrabCreate transforme un ticket Kanban en code fonctionnel : l'IA (Claude/GPT) analyse la codebase existante, génère les modifications, les pousse sur le dépôt Git, lance une review automatique et déclenche le déploiement — le développeur n'a qu'à valider.
 
 ## Ce que j'ai appris
 
