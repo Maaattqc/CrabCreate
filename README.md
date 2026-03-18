@@ -144,14 +144,20 @@ Dans un contexte de maintenance d'applications legacy, les modifications manuell
 
 ![Page d'accueil](https://mathieu-fournier.net/crabcreate/docs/screenshot-home.png)
 
-## 🤖 AI-Assisted Development
+## 🤖 Développement assisté par IA
 
-Projet développé avec **Claude Code** (fichier `CLAUDE.md` complet avec conventions). L'AI a été utilisée pour :
-- L'architecture complète du monorepo (client/server)
-- Le pipeline AI en 10 étapes avec gestion de la job queue async
-- Les 8 fichiers de documentation technique dans `docs/`
-- Les tests Vitest + Testing Library
-- L'internationalisation FR/EN
+Ce projet a été conçu, architecturé et dirigé par moi — chaque décision technique, structure de données, flow UX et choix de librairie est le résultat de ma réflexion. **Claude Code** a servi d'outil d'exécution : une fois les specs et conventions définies dans `CLAUDE.md`, l'IA a accéléré l'implémentation des patterns répétitifs.
+
+Ce que j'ai défini :
+- L'architecture monorepo, le schéma DB, le design du pipeline en 10 étapes
+- Les conventions de code, les règles de sécurité, les contrats d'API
+- Les choix de stack et l'ensemble des décisions d'architecture
+
+Ce que l'IA a accéléré :
+- L'implémentation des composants React selon mes specs
+- La génération des tests selon mes conventions de testing
+- La rédaction des 8 fichiers de documentation technique
+- Le boilerplate répétitif (routes CRUD, types TypeScript, i18n)
 
 ## Setup
 
