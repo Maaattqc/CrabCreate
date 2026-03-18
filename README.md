@@ -63,7 +63,7 @@
 | Service | Usage |
 |---------|-------|
 | `@anthropic-ai/sdk` | Claude (Sonnet/Opus) pour génération de code |
-| `openai` | GPT-4o fallback |
+| `openai` | GPT-5.3 fallback |
 | `stripe` | Paiements & abonnements |
 | Bitbucket API | Push commits, création de PRs |
 | Cloudflare Pages API | Deploy automatique des previews |
