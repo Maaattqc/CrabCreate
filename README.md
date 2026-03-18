@@ -1,5 +1,7 @@
 # CrabCreate
 
+[🇬🇧 Read in English](README.en.md)
+
 > 🌐 **[Voir la démo live](https://mathieu-fournier.net/crabcreate/)** — déployé sur mathieu-fournier.net
 
 > Dashboard Kanban qui automatise le développement PHP — l'utilisateur crée un ticket, l'IA code les modifications, push sur Bitbucket, review automatique, deploy via Jenkins.
