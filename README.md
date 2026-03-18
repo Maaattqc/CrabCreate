@@ -1,5 +1,7 @@
 # CrabCreate
 
+> 🌐 **[Voir la démo live](https://mathieu-fournier.net/crabcreate/)** — déployé sur mathieu-fournier.net
+
 > Dashboard Kanban qui automatise le développement PHP — l'utilisateur crée un ticket, l'IA code les modifications, push sur Bitbucket, review automatique, deploy via Jenkins.
 
 ![React](https://img.shields.io/badge/React_19-61DAFB?style=flat&logo=react&logoColor=black)
@@ -46,6 +48,10 @@ Dans un contexte de maintenance d'applications PHP legacy, les modifications man
 - **51 settings admin** — Configuration granulaire du pipeline, modèles AI, limites, comportements
 - **Auth sécurisée** — Email OTP → JWT cookie httpOnly, permissions par rôle
 - **Temps réel** — Socket.io pour le suivi live de l'avancement des jobs AI
+
+## Screenshots
+
+![Page d'accueil](https://mathieu-fournier.net/crabcreate/docs/screenshot-home.png)
 
 ## AI-Assisted Development
 
