@@ -17,4 +17,4 @@ server/logs/
 **/logs/*.log
 
 # Claude Code
-.claude/
+.claude/.env.local
