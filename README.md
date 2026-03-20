@@ -144,6 +144,10 @@ Dans un contexte de maintenance d'applications legacy, les modifications manuell
 
 ![Page d'accueil](https://raw.githubusercontent.com/Maaattqc/CrabCreate/main/docs/screenshot-home.png)
 
+![Dashboard Kanban](https://raw.githubusercontent.com/Maaattqc/CrabCreate/main/docs/screenshot-dashboard.jpg)
+
+![Admin Panel](https://raw.githubusercontent.com/Maaattqc/CrabCreate/main/docs/screenshot-admin.jpg)
+
 ## 🤖 Développement assisté par IA
 
 Ce projet a été conçu, architecturé et dirigé par moi — chaque décision technique, structure de données, flow UX et choix de librairie est le résultat de ma réflexion. **Claude Code** a servi d'outil d'exécution : une fois les specs et conventions définies dans `CLAUDE.md`, l'IA a accéléré l'implémentation des patterns répétitifs.
