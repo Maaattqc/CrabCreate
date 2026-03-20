@@ -142,7 +142,7 @@ Dans un contexte de maintenance d'applications legacy, les modifications manuell
 
 ## Screenshots
 
-![Page d'accueil](https://mathieu-fournier.net/crabcreate/docs/screenshot-home.png)
+![Page d'accueil](https://raw.githubusercontent.com/Maaattqc/CrabCreate/main/docs/screenshot-home.png)
 
 ## 🤖 Développement assisté par IA
 
