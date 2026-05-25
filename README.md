@@ -174,3 +174,9 @@ npm install
 cd server && npm install && cd ..
 npm run dev  # Lance client (5173) + server (3000) en parallèle
 ```
+
+---
+
+## Author
+
+**Mathieu Fournier** · mathieufournierqc@outlook.com — [@Maaattqc](https://github.com/Maaattqc)
