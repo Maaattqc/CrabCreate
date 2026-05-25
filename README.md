@@ -2,7 +2,6 @@
 
 [🇬🇧 Read in English](README.en.md)
 
-> 🌐 **[Voir la démo live](https://mathieu-fournier.net/crabcreate/)** — déployé sur mathieu-fournier.net
 
 > Dashboard Kanban AI-powered qui automatise le cycle de développement — de la création du ticket jusqu'au déploiement en production, sans intervention manuelle.
 

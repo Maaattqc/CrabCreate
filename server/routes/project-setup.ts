@@ -8,6 +8,7 @@ import * as cloudflarePages from '../services/cloudflare-pages';
 import * as supabase from '../services/supabase';
 import { hasMinRole } from '../permissions';
 import logger from '../services/logger';
+import { isAutoRepoConfigured, autoCreateRepo } from '../services/auto-repo';
 
 const router = Router();
 
@@ -216,6 +217,25 @@ router.post('/configure-deploy', async (req: Request, res: Response) => {
   } catch (err) {
     logger.error('[ProjectSetup] configure-deploy error:', err);
     res.status(500).json({ error: 'Setup operation failed' });
+  }
+});
+
+// POST /api/projects/:id/setup/auto-repo — auto-create GitHub repo using env vars
+router.post('/auto-repo', async (req: Request, res: Response) => {
+  if (!requireProjectAdmin(req, res)) return;
+  if (!isAutoRepoConfigured()) {
+    return res.status(400).json({ error: 'Auto-repo not configured' });
+  }
+  const project = req.project!;
+  try {
+    const result = await autoCreateRepo(project.id, project.slug, true);
+    if (!result.success) return res.status(500).json({ error: result.error });
+    repo.updateProjectSetup(project.id, true);
+    repo.insertAuditLog(req.user!.userId, req.user!.email, 'auto_repo_create', 'project', project.id, project.slug);
+    res.json({ success: true, webUrl: result.webUrl });
+  } catch (err) {
+    logger.error('[ProjectSetup] auto-repo error:', err);
+    res.status(500).json({ error: 'Auto-repo creation failed' });
   }
 });
 

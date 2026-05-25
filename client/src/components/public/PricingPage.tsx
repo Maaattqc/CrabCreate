@@ -42,7 +42,8 @@ export default function PricingPage() {
   const [checkoutError, setCheckoutError] = useState('');
 
   useEffect(() => {
-    fetch('/api/plans')
+    const _base = import.meta.env.BASE_URL.replace(/\/$/, '');
+    fetch(`${_base}/api/plans`)
       .then(r => r.ok ? r.json() : DEFAULTS)
       .then(data => setCfg(data))
       .catch(() => {});
@@ -56,7 +57,8 @@ export default function PricingPage() {
     setCheckoutLoading(true);
     setCheckoutError('');
     try {
-      const res = await fetch('/api/billing/checkout', {
+      const _base = import.meta.env.BASE_URL.replace(/\/$/, '');
+      const res = await fetch(`${_base}/api/billing/checkout`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',

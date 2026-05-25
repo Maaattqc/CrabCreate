@@ -7,7 +7,9 @@ type SocketCallback = (...args: any[]) => void;
 // ── Module-level singleton socket ────────────────────────────────────────────
 // All useSocket() callers share ONE connection.  This prevents duplicate
 // connections, listener churn, and the "events arrive on the wrong socket" bug.
+const BASE = import.meta.env.BASE_URL.replace(/\/$/, ''); // e.g. "/crabcreate"
 const socket: Socket = io(window.location.origin, {
+  path: `${BASE}/socket.io/`,
   transports: ['websocket', 'polling'],
   withCredentials: true,
   autoConnect: false, // connect explicitly from the first useSocket() mount

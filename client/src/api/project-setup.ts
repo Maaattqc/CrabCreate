@@ -50,3 +50,15 @@ export async function skipDeploy(): Promise<{ success: boolean }> {
     method: 'POST',
   });
 }
+
+export async function checkAutoRepo(): Promise<{ configured: boolean }> {
+  return apiJson<{ configured: boolean }>('/api/projects/auto-repo-status');
+}
+
+export async function triggerAutoRepo(): Promise<{ success: boolean; webUrl?: string; error?: string }> {
+  return apiJson<{ success: boolean; webUrl?: string; error?: string }>('/api/project-setup/auto-repo', {
+    method: 'POST',
+    jsonBody: {},
+    includeProjectId: true,
+  });
+}

@@ -120,7 +120,8 @@ export default function LoginPage({ onClose }: LoginPageProps) {
     setError('');
     setLoading(true);
     try {
-      const endpoint = role === 'admin' ? '/api/auth/dev-login' : role === 'new' ? '/api/auth/dev-login-new' : '/api/auth/dev-login-client';
+      const _base = import.meta.env.BASE_URL.replace(/\/$/, '');
+      const endpoint = role === 'admin' ? `${_base}/api/auth/dev-login` : role === 'new' ? `${_base}/api/auth/dev-login-new` : `${_base}/api/auth/dev-login-client`;
       const res = await fetch(endpoint, {
         method: 'POST',
         credentials: 'include',

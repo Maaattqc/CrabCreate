@@ -2,6 +2,9 @@ export const AUTH_UNAUTHORIZED_EVENT = 'crab:auth-unauthorized';
 const DEFAULT_TIMEOUT_MS = 15000;
 const PROJECT_STORAGE_KEY = 'crab-current-project';
 
+// Base URL prefix for API calls (handles subpath deployments like /crabcreate/)
+const BASE = import.meta.env.BASE_URL.replace(/\/$/, ''); // e.g. "/crabcreate"
+
 type ResponseType = 'json' | 'text' | 'blob' | 'void';
 
 export interface UnauthorizedDetail {
@@ -185,7 +188,8 @@ export async function apiRequest<T>(url: string, options: ApiRequestOptions = {}
   });
 
   try {
-    const response = (await Promise.race([fetch(url, requestOptions), timeoutPromise])) as Response;
+    const resolvedUrl = url.startsWith('/') ? `${BASE}${url}` : url;
+    const response = (await Promise.race([fetch(resolvedUrl, requestOptions), timeoutPromise])) as Response;
 
     if (response.status === 401) {
       emitUnauthorized(url, 401);

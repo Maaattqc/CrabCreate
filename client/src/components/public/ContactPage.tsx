@@ -14,7 +14,8 @@ export default function ContactPage() {
     setError('');
     setLoading(true);
     try {
-      const res = await fetch('/api/contact', {
+      const _base = import.meta.env.BASE_URL.replace(/\/$/, '');
+      const res = await fetch(`${_base}/api/contact`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),

@@ -140,7 +140,8 @@ function Dashboard() {
   });
 
   useEffect(() => {
-    fetch('/api/app-config', { credentials: 'include' })
+    const _base = import.meta.env.BASE_URL.replace(/\/$/, '');
+    fetch(`${_base}/api/app-config`, { credentials: 'include' })
       .then(r => r.ok ? r.json() : null)
       .then(data => { if (data) setAppConfig(data); })
       .catch(() => {});
@@ -527,8 +528,10 @@ function DashboardWithAuth() {
     prevUserIdRef.current = user?.id;
   }, [user?.id, closeLogin]);
 
+  // Don't show login modal during onboarding tutorial
+  const isOnboarding = !localStorage.getItem('crab-onboarded');
   // Show modal: on first load if not auth'd (until dismissed), or when triggered by action (including visitors)
-  const showModal = (!user && (showLogin || !dismissed)) || (user?.isVisitor && showLogin);
+  const showModal = ((!user && (showLogin || !dismissed)) || (user?.isVisitor && showLogin)) && !isOnboarding;
 
   if (loading) {
     return (

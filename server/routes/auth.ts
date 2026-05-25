@@ -194,7 +194,7 @@ function signToken(payload: JwtPayload): { token: string; maxAgeMs: number } {
 function setAuthCookie(res: Response, token: string, maxAgeMs: number): void {
   res.cookie('crab_token', token, {
     httpOnly: true,
-    secure: config.nodeEnv === 'production',
+    secure: true, // always secure (served via HTTPS)
     sameSite: 'strict',
     maxAge: maxAgeMs,
     path: '/',
@@ -401,7 +401,7 @@ router.post('/logout', (req: Request, res: Response) => {
   res.clearCookie('crab_token', {
     path: '/',
     httpOnly: true,
-    secure: config.nodeEnv === 'production',
+    secure: true, // always secure (served via HTTPS)
     sameSite: 'strict',
   });
   res.json({ message: 'DÃ©connectÃ©' });

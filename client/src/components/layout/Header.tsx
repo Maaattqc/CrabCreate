@@ -179,7 +179,8 @@ export default function Header({ search, onSearchChange, viewMode, onViewModeCha
   const startBillingCheckout = async () => {
     setBillingNotice(null);
     try {
-      const res = await fetch('/api/billing/checkout', {
+      const _base2 = import.meta.env.BASE_URL.replace(/\/$/, '');
+      const res = await fetch(`${_base2}/api/billing/checkout`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -560,7 +561,7 @@ export default function Header({ search, onSearchChange, viewMode, onViewModeCha
                   <div className="border-t border-th-border mx-2" />
                   <div className="p-2">
                     <button
-                      onClick={() => { window.location.href = '/admin'; }}
+                      onClick={() => { window.location.href = import.meta.env.BASE_URL + 'admin'; }}
                       className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-amber-500/10 transition-colors"
                     >
                       <Crown size={16} className="text-amber-400" />

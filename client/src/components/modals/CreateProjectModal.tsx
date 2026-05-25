@@ -80,6 +80,7 @@ export default function CreateProjectModal({ onClose }: CreateProjectModalProps)
         slug,
         description: description.trim(),
         is_private: isPrivate ? 1 : 0,
+        auto_repo: mode === 'new', // auto-create GitHub repo when creating new project
       });
 
       // If connect mode, also connect the repo to the newly created project

@@ -122,8 +122,9 @@ interface AuditLog {
 
 type Tab = 'stats' | 'users' | 'contacts' | 'logs' | 'settings';
 
-const API = '/api/admin';
-const SETTINGS_API = '/api/settings';
+const BASE = import.meta.env.BASE_URL.replace(/\/$/, '');
+const API = `${BASE}/api/admin`;
+const SETTINGS_API = `${BASE}/api/settings`;
 
 function fmt(n: number): string {
   if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';

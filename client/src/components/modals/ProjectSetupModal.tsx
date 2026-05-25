@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { X, Github, GitBranch, Cloud, ChevronRight, Check, Loader2, Plus, Link, XCircle, Wifi } from 'lucide-react';
 import { useLanguage } from '../../hooks/useLanguage';
-import { connectRepo, createNewRepo, configureDeploy, skipDeploy, testConnection } from '../../api/project-setup';
+import { connectRepo, createNewRepo, configureDeploy, skipDeploy, testConnection, triggerAutoRepo } from '../../api/project-setup';
 import type { GitProviderType } from '../../types';
 
 interface ProjectSetupModalProps {
@@ -85,6 +85,20 @@ export default function ProjectSetupModal({ onClose, onComplete }: ProjectSetupM
     }
   };
 
+  const handleAutoRepo = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      await triggerAutoRepo();
+      await skipDeploy(); // skip Cloudflare Pages step automatically
+      onComplete();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleConfigureDeploy = async () => {
     setLoading(true);
     setError('');
@@ -141,23 +155,47 @@ export default function ProjectSetupModal({ onClose, onComplete }: ProjectSetupM
 
               {/* Mode selection */}
               {!repoMode && (
-                <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-3">
+                  {/* Auto-GitHub button (primary) */}
                   <button
-                    onClick={() => setRepoMode('connect')}
-                    className="flex flex-col items-center gap-2 p-4 rounded-xl border border-th-border hover:border-amber-500/50 hover:bg-amber-500/5 transition-colors"
+                    onClick={handleAutoRepo}
+                    disabled={loading}
+                    className="w-full flex items-center gap-4 p-4 rounded-xl border border-amber-500/50 bg-amber-500/10 hover:bg-amber-500/20 transition-colors text-left"
                   >
-                    <Link size={24} className="text-amber-400" />
-                    <span className="text-sm font-medium text-tx-primary">{t.setupConnectExisting}</span>
-                    <span className="text-[11px] text-tx-faint text-center">{t.setupConnectExistingDesc}</span>
+                    <div className="w-11 h-11 rounded-xl bg-amber-500/20 flex items-center justify-center shrink-0">
+                      <Github size={22} className="text-amber-400" />
+                    </div>
+                    <div>
+                      <span className="text-sm font-medium text-amber-400 block">Créer sur GitHub automatiquement</span>
+                      <span className="text-[12px] text-tx-faint">Repo privé créé instantanément sur Maaattqc/GitHub</span>
+                    </div>
+                    {loading && <Loader2 size={16} className="animate-spin text-amber-400 ml-auto" />}
                   </button>
-                  <button
-                    onClick={() => setRepoMode('create')}
-                    className="flex flex-col items-center gap-2 p-4 rounded-xl border border-th-border hover:border-amber-500/50 hover:bg-amber-500/5 transition-colors"
-                  >
-                    <Plus size={24} className="text-amber-400" />
-                    <span className="text-sm font-medium text-tx-primary">{t.setupCreateNew}</span>
-                    <span className="text-[11px] text-tx-faint text-center">{t.setupCreateNewDesc}</span>
-                  </button>
+
+                  <div className="relative flex items-center gap-2">
+                    <div className="flex-1 border-t border-th-border" />
+                    <span className="text-[11px] text-tx-faint">ou</span>
+                    <div className="flex-1 border-t border-th-border" />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      onClick={() => setRepoMode('connect')}
+                      className="flex flex-col items-center gap-2 p-4 rounded-xl border border-th-border hover:border-amber-500/50 hover:bg-amber-500/5 transition-colors"
+                    >
+                      <Link size={24} className="text-amber-400" />
+                      <span className="text-sm font-medium text-tx-primary">{t.setupConnectExisting}</span>
+                      <span className="text-[11px] text-tx-faint text-center">{t.setupConnectExistingDesc}</span>
+                    </button>
+                    <button
+                      onClick={() => setRepoMode('create')}
+                      className="flex flex-col items-center gap-2 p-4 rounded-xl border border-th-border hover:border-amber-500/50 hover:bg-amber-500/5 transition-colors"
+                    >
+                      <Plus size={24} className="text-amber-400" />
+                      <span className="text-sm font-medium text-tx-primary">{t.setupCreateNew}</span>
+                      <span className="text-[11px] text-tx-faint text-center">{t.setupCreateNewDesc}</span>
+                    </button>
+                  </div>
                 </div>
               )}
 
